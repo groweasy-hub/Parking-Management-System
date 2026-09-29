@@ -26,12 +26,18 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "ParkFlow · Smart Parking Management",
+  title: "Parking Management System",
   description: "Real-time multi-project parking management for commercial buildings and campuses",
+  applicationName: "Parking Management System",
+  icons: {
+    icon: [{ url: "/icon.svg?v=2", type: "image/svg+xml" }],
+    shortcut: [{ url: "/icon.svg?v=2", type: "image/svg+xml" }],
+    apple: [{ url: "/icon.svg?v=2", type: "image/svg+xml" }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "ParkFlow",
+    title: "Parking Management System",
   },
 };
 
@@ -51,4 +57,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
-
