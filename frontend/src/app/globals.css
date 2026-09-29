@@ -183,12 +183,56 @@
 /* Mobile App Native Feel Interactions */
 .tap-bounce {
   transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s ease;
-  user-select: none;
-  -webkit-user-select: none;
 }
 
 .tap-bounce:active {
   transform: scale(0.97);
+}
+
+.gate-press {
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.gate-press:active {
+  transform: scale(0.96);
+}
+
+@keyframes gate-screen-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes gate-card-rise {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.gate-screen {
+  animation: gate-screen-enter 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.gate-card-rise {
+  animation: gate-card-rise 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.gate-mobile-surface {
+  background:
+    radial-gradient(circle at 50% -8%, rgb(37 99 235 / 8%), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f6f8fb 58%, #edf2f7 100%);
+}
+
+.dark .gate-mobile-surface {
+  background:
+    radial-gradient(circle at 50% -8%, rgb(59 130 246 / 14%), transparent 34%),
+    linear-gradient(180deg, #0f172a 0%, #101827 58%, #020617 100%);
 }
 
 /* Safe area padding for mobile notches & home bars */
@@ -215,6 +259,66 @@
   scroll-behavior: smooth;
 }
 
+@keyframes calendar-slide-enter-left {
+  from {
+    opacity: 0;
+    transform: translateX(-2rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes calendar-slide-enter-right {
+  from {
+    opacity: 0;
+    transform: translateX(2rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes calendar-slide-exit-left {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-2rem);
+  }
+}
+
+@keyframes calendar-slide-exit-right {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(2rem);
+  }
+}
+
+.calendar-slide-enter-left {
+  animation: calendar-slide-enter-left 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.calendar-slide-enter-right {
+  animation: calendar-slide-enter-right 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.calendar-slide-exit-left {
+  animation: calendar-slide-exit-left 180ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.calendar-slide-exit-right {
+  animation: calendar-slide-exit-right 180ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
 /* Subtle glow accents */
 .glow-primary {
   box-shadow: 0 0 25px -5px oklch(0.45 0.15 250 / 25%);
@@ -222,4 +326,27 @@
 
 .glow-emerald {
   box-shadow: 0 0 25px -5px oklch(0.65 0.16 160 / 30%);
+}
+
+body,
+main,
+section,
+article,
+div,
+p,
+span,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+label,
+td,
+th,
+li,
+button,
+a {
+  user-select: text;
+  -webkit-user-select: text;
 }

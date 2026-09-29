@@ -6,6 +6,9 @@ export interface IFloor extends Document {
   name: string;
   code: string;
   displayOrder: number;
+  carCapacity: number;
+  bikeCapacity: number;
+  otherCapacity: number;
   status: EntityStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -17,6 +20,9 @@ const floorSchema = new Schema<IFloor>(
     name: { type: String, required: true, trim: true },
     code: { type: String, required: true, trim: true, uppercase: true },
     displayOrder: { type: Number, required: true, default: 0 },
+    carCapacity: { type: Number, required: true, min: 0, default: 0 },
+    bikeCapacity: { type: Number, required: true, min: 0, default: 0 },
+    otherCapacity: { type: Number, required: true, min: 0, default: 0 },
     status: { type: String, enum: ENTITY_STATUSES, default: "ACTIVE" },
   },
   { timestamps: true }

@@ -60,7 +60,7 @@ async function main() {
     name: "Tester",
     email: "tester@smoke.local",
     passwordHash: await hashPassword("x"),
-    role: "ENTRY_GATEMAN",
+    role: "GATEKEEPER",
     projectId: project._id,
     gateId: entryGate._id,
     status: "ACTIVE",
@@ -220,3 +220,4 @@ main().catch((err) => {
   console.error("Smoke test crashed", err);
   process.exit(1);
 });
+

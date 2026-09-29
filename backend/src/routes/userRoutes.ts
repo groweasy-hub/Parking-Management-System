@@ -7,7 +7,25 @@ const router = Router();
 
 router.use(authenticate);
 router.get("/", requireRole("SUPER_ADMIN", "PROJECT_ADMIN"), listUsers);
-router.post("/", requireRole("SUPER_ADMIN", "PROJECT_ADMIN"), validate(createUserSchema), createUser);
-router.patch("/:id", requireRole("SUPER_ADMIN", "PROJECT_ADMIN"), validate(updateUserSchema), updateUser);
+router.post(
+  "/",
+  requireRole("SUPER_ADMIN", "PROJECT_ADMIN"),
+  validate(createUserSchema, "body", {
+    genericMessage: "Unable to complete registration.",
+    genericCode: "REGISTRATION_FAILED",
+    logLabel: "users.create",
+  }),
+  createUser
+);
+router.patch(
+  "/:id",
+  requireRole("SUPER_ADMIN", "PROJECT_ADMIN"),
+  validate(updateUserSchema, "body", {
+    genericMessage: "Unable to update user.",
+    genericCode: "USER_UPDATE_FAILED",
+    logLabel: "users.update",
+  }),
+  updateUser
+);
 
 export default router;

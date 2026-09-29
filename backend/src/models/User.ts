@@ -7,6 +7,8 @@ export interface IUser extends Document {
   phone?: string;
   passwordHash: string;
   role: Role;
+  customRoleLabel?: string;
+  mustChangePassword: boolean;
   projectId?: Types.ObjectId | null;
   gateId?: Types.ObjectId | null;
   status: EntityStatus;
@@ -22,6 +24,8 @@ const userSchema = new Schema<IUser>(
     phone: { type: String, trim: true },
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: ROLES, required: true },
+    customRoleLabel: { type: String, trim: true },
+    mustChangePassword: { type: Boolean, default: false },
     projectId: { type: Schema.Types.ObjectId, ref: "Project", default: null },
     gateId: { type: Schema.Types.ObjectId, ref: "Gate", default: null },
     status: { type: String, enum: ENTITY_STATUSES, default: "ACTIVE" },

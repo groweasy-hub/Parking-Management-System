@@ -33,8 +33,6 @@ import {
   History,
   BarChart3,
   MoreHorizontal,
-  ArrowDownToLine,
-  ArrowUpFromLine,
 } from "lucide-react";
 import { DASHBOARD_ROLES } from "@/lib/roles";
 
@@ -100,45 +98,6 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      {/* Campus / Project Quick Switcher */}
-      {user?.role === "SUPER_ADMIN" && projects.length > 0 && (
-        <div className="px-3 pt-3 shrink-0">
-          <div className="rounded-xl bg-slate-900/90 border border-slate-800 p-2.5 space-y-1.5">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Active Campus
-              </span>
-              <span className="text-[10px] font-bold text-primary font-mono">
-                {projects.find((p) => p._id === currentProjectId)?.code ?? "CAMPUS"}
-              </span>
-            </div>
-            <Select
-              value={currentProjectId}
-              onValueChange={(v) => v && setCurrentProjectId(v)}
-            >
-              <SelectTrigger className="w-full h-8 text-xs font-semibold bg-slate-950/90 border-slate-700/80 text-white rounded-lg focus:ring-1 focus:ring-primary">
-                <SelectValue placeholder="Select Campus">
-                  {(value: string | null) =>
-                    projects.find((p) => p._id === value)?.name ?? "Select Campus"
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent className="bg-slate-900 border-slate-800 text-white">
-                {projects.map((p) => (
-                  <SelectItem
-                    key={p._id}
-                    value={p._id}
-                    className="text-xs font-medium focus:bg-slate-800 focus:text-white"
-                  >
-                    {p.name} ({p.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
-
       {/* Navigation List of All Options */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
         {navItems.map((item) => {
@@ -199,7 +158,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         {/* =================================================================== */}
         {/* DESKTOP SIDEBAR (Permanent on >= md screens)                         */}
         {/* =================================================================== */}
-        <aside className="hidden md:flex w-68 shrink-0 flex-col border-r border-slate-800/80 shadow-md">
+        <aside className="hidden md:sticky md:top-0 md:flex md:h-screen w-68 shrink-0 flex-col border-r border-slate-800/80 shadow-md">
           {renderSidebarContent(false)}
         </aside>
 
@@ -268,23 +227,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               )}
             </div>
 
-            {/* Quick Gate Links & Actions */}
+            {/* Header Actions */}
             <div className="flex items-center gap-2 shrink-0">
-              <Link
-                href="/gate/entry"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold hover:bg-muted transition-all"
-              >
-                <ArrowDownToLine className="h-3.5 w-3.5 text-emerald-500" />
-                <span>Entry Gate</span>
-              </Link>
-              <Link
-                href="/gate/exit"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold hover:bg-muted transition-all"
-              >
-                <ArrowUpFromLine className="h-3.5 w-3.5 text-rose-500" />
-                <span>Exit Gate</span>
-              </Link>
-
               <div className="flex md:hidden">
                 <Button
                   variant="outline"

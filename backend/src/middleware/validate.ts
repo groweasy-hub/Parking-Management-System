@@ -4,10 +4,38 @@ import { AppError } from "../utils/AppError";
 
 type Target = "body" | "query" | "params";
 
-export function validate(schema: ZodTypeAny, target: Target = "body") {
+type ValidateOptions = {
+  genericMessage?: string;
+  genericCode?: string;
+  logLabel?: string;
+};
+
+export function validate(schema: ZodTypeAny, target: Target = "body", options: ValidateOptions = {}) {
   return (req: Request, _res: Response, next: NextFunction) => {
     const result = schema.safeParse(req[target]);
     if (!result.success) {
+      if (options.logLabel) {
+        console.warn("[validation] request rejected", {
+          label: options.logLabel,
+          method: req.method,
+          path: req.originalUrl,
+          issues: result.error.issues.map((issue) => ({
+            field: issue.path.join(".") || target,
+            code: issue.code,
+            message: issue.message,
+          })),
+        });
+      }
+
+      if (options.genericMessage) {
+        return next(
+          AppError.badRequest(
+            options.genericMessage,
+            options.genericCode ?? "VALIDATION_ERROR"
+          )
+        );
+      }
+
       const message = result.error.issues
         .map((i) => `${i.path.join(".") || target}: ${i.message}`)
         .join("; ");

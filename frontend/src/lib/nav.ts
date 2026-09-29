@@ -35,7 +35,7 @@ export const ADMIN_NAV: NavItem[] = [
   },
   {
     href: "/admin/floors",
-    label: "Floors",
+    label: "Parking Floors",
     icon: Layers,
     roles: ["SUPER_ADMIN", "PROJECT_ADMIN"],
   },

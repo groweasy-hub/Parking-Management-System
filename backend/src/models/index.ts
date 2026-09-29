@@ -9,3 +9,4 @@ export * from "./Occupancy";
 export * from "./AuditLog";
 export * from "./SystemSettings";
 export * from "./Counter";
+export * from "./GateDuty";

@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/auth-context";
 import { useProject } from "@/lib/project-context";
 import { apiFetch, ApiError } from "@/lib/api";
 import { AllocationAvailability, Company, Floor, Gate, ParkingSessionRecord, VehicleType } from "@/lib/types";
@@ -46,7 +46,7 @@ interface AvailabilityState {
 }
 
 export default function EntryGatePage() {
-  const { user } = useAuth();
+  const router = useRouter();
   const { currentProjectId } = useProject();
 
   // Mobile Step Wizard State (1: Vehicle, 2: Destination, 3: Clearance)
@@ -72,7 +72,7 @@ export default function EntryGatePage() {
 
   // Gates & Live Active Sessions
   const [entryGates, setEntryGates] = useState<Gate[]>([]);
-  const [selectedGateId, setSelectedGateId] = useState<string | null>(user?.gateId ?? null);
+  const [selectedGateId, setSelectedGateId] = useState<string | null>(null);
   const [activeCount, setActiveCount] = useState<number>(0);
   const [sessions, setSessions] = useState<ParkingSessionRecord[]>([]);
 
@@ -118,10 +118,21 @@ export default function EntryGatePage() {
     apiFetch<{ gates: Gate[] }>(`/api/gates?projectId=${currentProjectId}&type=ENTRY`)
       .then((data) => {
         setEntryGates(data.gates);
-        if (!selectedGateId && data.gates[0]) setSelectedGateId(data.gates[0]._id);
       })
       .catch(() => undefined);
-  }, [currentProjectId, selectedGateId]);
+  }, [currentProjectId]);
+
+  useEffect(() => {
+    apiFetch<{ duty: { gateId: { _id: string; type: "ENTRY" | "EXIT" } | string; gateType: "ENTRY" | "EXIT"; endedAt?: string | null } | null }>("/api/gate-duty/today")
+      .then((data) => {
+        if (!data.duty || data.duty.endedAt || data.duty.gateType !== "ENTRY") {
+          router.replace("/gate/select");
+          return;
+        }
+        setSelectedGateId(typeof data.duty.gateId === "object" ? data.duty.gateId._id : data.duty.gateId);
+      })
+      .catch(() => router.replace("/gate/select"));
+  }, [router]);
 
   // Load companies
   useEffect(() => {
@@ -181,6 +192,7 @@ export default function EntryGatePage() {
 
       setCheckingAvailability(true);
       try {
+        const allocationVehicleType = vType === "OTHER" ? "CAR" : vType;
         let companyId = comp?._id;
         if (!companyId && companies.length > 0) {
           companyId = companies[0]._id;
@@ -198,7 +210,7 @@ export default function EntryGatePage() {
         }
 
         const data = await apiFetch<{ allocations: AllocationAvailability[] }>(
-          `/api/parking/availability?projectId=${currentProjectId}&companyId=${companyId}&vehicleType=${vType}`
+          `/api/parking/availability?projectId=${currentProjectId}&companyId=${companyId}&vehicleType=${allocationVehicleType}`
         );
 
         let targetAlloc: AllocationAvailability | undefined;
@@ -351,11 +363,11 @@ export default function EntryGatePage() {
   );
 
   return (
-    <div className="flex flex-col min-h-screen w-full bg-slate-100/90 dark:bg-slate-950 text-slate-900 dark:text-slate-100 select-none">
+    <div className="gate-mobile-surface flex min-h-[calc(100dvh-76px)] w-full flex-col text-slate-900 dark:text-slate-100 lg:min-h-screen lg:bg-transparent">
       {/* ========================================================================= */}
       {/* 1. MOBILE APP VIEW (< lg) - Exact Match to User Screenshots               */}
       {/* ========================================================================= */}
-      <div className="flex flex-col w-full lg:hidden bg-white dark:bg-slate-900">
+      <div className="flex min-h-[calc(100dvh-76px)] w-full flex-col lg:hidden">
         {/* Clean Back navigation if in step 2 or 3 */}
         {step > 1 && (
           <div className="px-5 pt-3 pb-1 border-b border-slate-100 dark:border-slate-800">
@@ -370,10 +382,10 @@ export default function EntryGatePage() {
         )}
 
         {/* Mobile Main Body */}
-        <main className="flex-1 flex flex-col justify-between px-5 py-4 sm:py-6 overflow-y-auto">
+        <main className="ios-scroll flex-1 overflow-y-auto px-5 pb-32 pt-5 sm:py-6">
           {/* STEP 1: SELECT VEHICLE TYPE */}
           {step === 1 && (
-            <div className="flex-1 flex flex-col justify-between space-y-4 animate-in fade-in duration-200">
+            <div className="gate-card-rise flex min-h-full flex-col space-y-4">
               <div className="text-center pt-2">
                 <span className="text-xs font-extrabold tracking-widest text-[#1565C0] uppercase">
                   WELCOME
@@ -391,7 +403,7 @@ export default function EntryGatePage() {
                   type="button"
                   onClick={() => setVehicleType("BIKE")}
                   className={cn(
-                    "w-full flex items-center justify-between p-3.5 sm:p-4 rounded-2xl transition-all tap-bounce text-left border shadow-2xs",
+                    "gate-press w-full flex items-center justify-between p-3.5 sm:p-4 rounded-2xl transition-all text-left border shadow-2xs",
                     vehicleType === "BIKE"
                       ? "border-2 border-[#1565C0] bg-[#EFF6FF] shadow-sm"
                       : "border-slate-200 bg-white hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700"
@@ -412,7 +424,7 @@ export default function EntryGatePage() {
                   type="button"
                   onClick={() => setVehicleType("CAR")}
                   className={cn(
-                    "w-full flex items-center justify-between p-3.5 sm:p-4 rounded-2xl transition-all tap-bounce text-left border shadow-2xs",
+                    "gate-press w-full flex items-center justify-between p-3.5 sm:p-4 rounded-2xl transition-all text-left border shadow-2xs",
                     vehicleType === "CAR"
                       ? "border-2 border-[#1565C0] bg-[#EFF6FF] shadow-sm"
                       : "border-slate-200 bg-white hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700"
@@ -433,7 +445,7 @@ export default function EntryGatePage() {
                   type="button"
                   onClick={() => setVehicleType("OTHER")}
                   className={cn(
-                    "w-full flex items-center justify-between p-3.5 sm:p-4 rounded-2xl transition-all tap-bounce text-left border shadow-2xs",
+                    "gate-press w-full flex items-center justify-between p-3.5 sm:p-4 rounded-2xl transition-all text-left border shadow-2xs",
                     vehicleType === "OTHER"
                       ? "border-2 border-[#1565C0] bg-[#EFF6FF] shadow-sm"
                       : "border-slate-200 bg-white hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700"
@@ -470,25 +482,27 @@ export default function EntryGatePage() {
               </div>
 
               {/* Next Button */}
-              <button
-                type="button"
-                disabled={!vehicleType}
-                onClick={() => setStep(2)}
-                className={cn(
-                  "w-full h-13 rounded-2xl font-bold text-base flex items-center justify-center gap-2 transition-all tap-bounce shadow-md",
-                  vehicleType
-                    ? "bg-[#1565C0] hover:bg-blue-700 text-white shadow-blue-500/25 active:scale-[0.98]"
-                    : "bg-slate-200 text-slate-400 cursor-not-allowed dark:bg-slate-800"
-                )}
-              >
-                Next <ArrowRight className="h-5 w-5" />
-              </button>
+              <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-5 py-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95">
+                <button
+                  type="button"
+                  disabled={!vehicleType}
+                  onClick={() => setStep(2)}
+                  className={cn(
+                    "gate-press flex h-13 w-full items-center justify-center gap-2 rounded-2xl text-base font-bold shadow-lg transition-all",
+                    vehicleType
+                      ? "bg-[#1565C0] hover:bg-blue-700 text-white shadow-blue-500/25"
+                      : "bg-slate-200 text-slate-400 cursor-not-allowed dark:bg-slate-800"
+                  )}
+                >
+                  Next <ArrowRight className="h-5 w-5" />
+                </button>
+              </div>
             </div>
           )}
 
           {/* STEP 2: SELECT COMPANY / FLOOR */}
           {step === 2 && (
-            <div className="flex-1 flex flex-col justify-between space-y-4 animate-in fade-in duration-200">
+            <div className="gate-card-rise flex min-h-full flex-col space-y-4">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 dark:bg-slate-800 border border-blue-200/60 px-3 py-1">
@@ -499,10 +513,10 @@ export default function EntryGatePage() {
 
                 <div>
                   <h1 className="text-2xl font-black text-slate-900 dark:text-white">
-                    Select Company / Floor
+                    Select Company
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                    Choose destination tenant or parking zone floor.
+                    Tap the company card the vehicle came for.
                   </p>
                 </div>
 
@@ -513,7 +527,7 @@ export default function EntryGatePage() {
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search company or floor..."
+                    placeholder="Search company..."
                     className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#1565C0] focus:bg-white transition-all"
                   />
                   {search && (
@@ -526,8 +540,8 @@ export default function EntryGatePage() {
                   )}
                 </div>
 
-                {/* Tabs */}
-                <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold">
+                {/* Company-first flow for gatekeepers */}
+                <div className="hidden grid-cols-3 gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold">
                   <button
                     type="button"
                     onClick={() => setActiveTab("company")}
@@ -585,7 +599,7 @@ export default function EntryGatePage() {
                               type="button"
                               onClick={() => setSelectedCompany(comp)}
                               className={cn(
-                                "w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all tap-bounce",
+                                "gate-press w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all",
                                 isSelected
                                   ? "border-2 border-[#1565C0] bg-[#EFF6FF]"
                                   : "border-slate-200 bg-white hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700"
@@ -627,7 +641,7 @@ export default function EntryGatePage() {
                               type="button"
                               onClick={() => setSelectedFloor(flr)}
                               className={cn(
-                                "w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all tap-bounce",
+                                "gate-press w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all",
                                 isSelected
                                   ? "border-2 border-[#1565C0] bg-[#EFF6FF]"
                                   : "border-slate-200 bg-white hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700"
@@ -684,18 +698,18 @@ export default function EntryGatePage() {
                     type="text"
                     value={vehicleNumber}
                     onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
-                    placeholder="e.g. MH 12 AB 1234"
+                    placeholder="TG 09 GH 1234"
                     className="w-full h-11 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-mono tracking-wider uppercase focus:outline-none focus:ring-2 focus:ring-[#1565C0] focus:bg-white"
                   />
                 </div>
               </div>
 
               {/* Bottom Buttons: Back & Next */}
-              <div className="flex items-center gap-3 pt-3">
+              <div className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-3 border-t border-slate-200 bg-white/95 px-5 py-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95">
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="w-1/3 h-13 rounded-2xl border-2 border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-base flex items-center justify-center gap-1 tap-bounce"
+                  className="gate-press w-1/3 h-13 rounded-2xl border-2 border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-base flex items-center justify-center gap-1"
                 >
                   <ArrowLeft className="h-5 w-5" /> Back
                 </button>
@@ -703,7 +717,7 @@ export default function EntryGatePage() {
                   type="button"
                   onClick={handleProceedToStep3}
                   disabled={checkingAvailability}
-                  className="flex-1 h-13 rounded-2xl bg-[#1565C0] hover:bg-blue-700 text-white font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all tap-bounce"
+                  className="gate-press flex-1 h-13 rounded-2xl bg-[#1565C0] hover:bg-blue-700 text-white font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 transition-all"
                 >
                   {checkingAvailability ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -719,7 +733,7 @@ export default function EntryGatePage() {
 
           {/* STEP 3: PARKING AVAILABILITY & ENTRY CONFIRMATION */}
           {step === 3 && (
-            <div className="flex-1 flex flex-col justify-between space-y-4 animate-in fade-in duration-200">
+            <div className="gate-card-rise flex min-h-full flex-col space-y-4">
               <div className="space-y-4 pt-1">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -797,13 +811,13 @@ export default function EntryGatePage() {
               </div>
 
               {/* Bottom Actions */}
-              <div className="space-y-2 pt-2">
+              <div className="fixed inset-x-0 bottom-0 z-20 space-y-2 border-t border-slate-200 bg-white/95 px-5 py-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-md safe-bottom dark:border-slate-800 dark:bg-slate-900/95">
                 {availability?.available ? (
                   <button
                     type="button"
                     onClick={handleConfirmEntry}
                     disabled={submitting}
-                    className="w-full h-13 rounded-2xl bg-[#1565C0] hover:bg-blue-700 text-white font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all tap-bounce"
+                    className="gate-press w-full h-13 rounded-2xl bg-[#1565C0] hover:bg-blue-700 text-white font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 transition-all"
                   >
                     {submitting ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
@@ -1228,7 +1242,7 @@ export default function EntryGatePage() {
                     type="text"
                     value={vehicleNumber}
                     onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
-                    placeholder="e.g. MH 12 AB 1234"
+                    placeholder="TG 09 GH 1234"
                     className="w-full h-12 px-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-base font-mono font-bold tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-[#1565C0] focus:bg-white transition-all"
                   />
                   {vehicleNumber && (

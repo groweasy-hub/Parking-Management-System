@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/auth-context";
 import { useProject } from "@/lib/project-context";
 import { apiFetch, ApiError } from "@/lib/api";
 import { Gate, ParkingSessionRecord, VehicleType } from "@/lib/types";
@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -99,11 +98,11 @@ function formatDuration(entryTime: string): string {
 }
 
 export default function ExitGatePage() {
-  const { user } = useAuth();
+  const router = useRouter();
   const { currentProjectId } = useProject();
 
   const [exitGates, setExitGates] = useState<Gate[]>([]);
-  const [selectedGateId, setSelectedGateId] = useState<string | null>(user?.gateId ?? null);
+  const [selectedGateId, setSelectedGateId] = useState<string | null>(null);
 
   const [sessions, setSessions] = useState<ParkingSessionRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -150,10 +149,21 @@ export default function ExitGatePage() {
     apiFetch<{ gates: Gate[] }>(`/api/gates?projectId=${currentProjectId}&type=EXIT`)
       .then((d) => {
         setExitGates(d.gates);
-        if (!selectedGateId && d.gates[0]) setSelectedGateId(d.gates[0]._id);
       })
       .catch(() => undefined);
-  }, [currentProjectId, selectedGateId]);
+  }, [currentProjectId]);
+
+  useEffect(() => {
+    apiFetch<{ duty: { gateId: { _id: string; type: "ENTRY" | "EXIT" } | string; gateType: "ENTRY" | "EXIT"; endedAt?: string | null } | null }>("/api/gate-duty/today")
+      .then((data) => {
+        if (!data.duty || data.duty.endedAt || data.duty.gateType !== "EXIT") {
+          router.replace("/gate/select");
+          return;
+        }
+        setSelectedGateId(typeof data.duty.gateId === "object" ? data.duty.gateId._id : data.duty.gateId);
+      })
+      .catch(() => router.replace("/gate/select"));
+  }, [router]);
 
   useProjectRealtime(currentProjectId, {
     onSessionEntry: () => loadSessions(),
@@ -307,25 +317,10 @@ export default function ExitGatePage() {
     }
   }
 
-  const noAssignedGate = user?.role === "EXIT_GATEMAN" && !user.gateId;
-
-  if (noAssignedGate) {
-    return (
-      <Card className="mx-auto max-w-md shadow-lg border-2 border-dashed">
-        <CardContent className="p-8 text-center">
-          <p className="text-lg font-bold">You are not assigned to an exit gate.</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Please ask your administrator to assign you to an exit gate in Users.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-4 sm:space-y-6">
+    <div className="gate-mobile-surface min-h-[calc(100svh-76px)] w-full space-y-4 px-4 py-5 sm:mx-auto sm:min-h-0 sm:max-w-7xl sm:bg-transparent sm:px-0 sm:py-0 sm:space-y-6">
       {/* TOTAL VEHICLES IN PARKING AREA HERO CARD */}
-      <div className="rounded-2xl border-2 border-rose-500/30 bg-gradient-to-br from-card via-card to-rose-500/5 p-3.5 sm:p-4 shadow-sm space-y-2.5">
+      <div className="gate-card-rise rounded-3xl border-2 border-rose-500/30 bg-gradient-to-br from-card via-card to-rose-500/5 p-4 shadow-sm space-y-2.5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 font-black shadow-xs">
@@ -367,23 +362,7 @@ export default function ExitGatePage() {
               <span>{vehicleCounts.OTHER} Other</span>
             </span>
 
-            {/* Gate selector if Super Admin or multiple exit gates */}
-            {user?.role === "SUPER_ADMIN" ? (
-              <Select value={selectedGateId} onValueChange={setSelectedGateId}>
-                <SelectTrigger className="h-8 w-28 sm:w-32 text-xs font-semibold rounded-xl bg-card border-border/80">
-                  <SelectValue placeholder="Gate">
-                    {(v: string | null) => exitGates.find((g) => g._id === v)?.name ?? "Gate"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {exitGates.map((g) => (
-                    <SelectItem key={g._id} value={g._id}>
-                      {g.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : exitGates.length > 1 ? (
+            {exitGates.length > 0 ? (
               <Badge variant="outline" className="font-semibold text-xs h-7 px-2 rounded-lg">
                 {exitGates.find((g) => g._id === selectedGateId)?.name ?? "Exit Gate"}
               </Badge>
@@ -421,7 +400,7 @@ export default function ExitGatePage() {
 
         <div className="relative">
           <Input
-            placeholder="Type vehicle plate (e.g. TS09AB1234) or session code..."
+            placeholder="Type vehicle plate (TG 09 GH 1234) or session code..."
             className="h-13 pl-11 pr-10 text-base uppercase font-mono tracking-wider font-extrabold rounded-xl border-2 focus-visible:border-primary"
             value={plateQuery}
             onChange={(e) => {

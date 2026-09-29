@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { useProject } from "@/lib/project-context";
 import { apiFetch, ApiError } from "@/lib/api";
-import { Company, Floor, ParkingAllocation, VEHICLE_TYPES, VehicleType } from "@/lib/types";
+import { Company, Floor, ParkingAllocation, VehicleType } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,7 @@ import { PageHeader } from "@/components/page-header";
 import { Plus, Loader2, Star, Car, Bike, Truck } from "lucide-react";
 
 const VEHICLE_ICONS: Record<VehicleType, typeof Car> = { CAR: Car, BIKE: Bike, OTHER: Truck };
+const ALLOCATABLE_VEHICLE_TYPES: VehicleType[] = ["CAR", "BIKE"];
 
 export default function AllocationsPage() {
   const { currentProjectId } = useProject();
@@ -43,7 +44,7 @@ export default function AllocationsPage() {
         apiFetch<{ companies: Company[] }>(`/api/companies?projectId=${currentProjectId}`),
         apiFetch<{ floors: Floor[] }>(`/api/floors?projectId=${currentProjectId}`),
       ]);
-      setAllocations(a.allocations);
+      setAllocations(a.allocations.filter((allocation) => allocation.vehicleType !== "OTHER"));
       setCompanies(c.companies);
       setFloors(f.floors);
     } finally {
@@ -168,7 +169,7 @@ export default function AllocationsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {VEHICLE_TYPES.map((v) => (
+                        {ALLOCATABLE_VEHICLE_TYPES.map((v) => (
                           <SelectItem key={v} value={v}>
                             {v}
                           </SelectItem>

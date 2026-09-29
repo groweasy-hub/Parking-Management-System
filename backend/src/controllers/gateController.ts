@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
-import { Gate } from "../models";
+import { Gate, GateDuty, ParkingSession } from "../models";
 import { GATE_TYPES } from "../types/enums";
 import { ensureProjectAccess } from "../middleware/auth";
 import { recordAudit } from "../services/auditService";
@@ -15,6 +15,7 @@ export const createGateSchema = z.object({
 
 export const updateGateSchema = z.object({
   name: z.string().min(1).optional(),
+  type: z.enum(GATE_TYPES).optional(),
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
 });
 
@@ -72,4 +73,37 @@ export const updateGate = asyncHandler(async (req: Request, res: Response) => {
   });
 
   res.json({ gate: existing });
+});
+
+export const deleteGate = asyncHandler(async (req: Request, res: Response) => {
+  const existing = await Gate.findById(req.params.id);
+  if (!existing) throw AppError.notFound("Gate not found.");
+  ensureProjectAccess(req.user!, String(existing.projectId));
+
+  const [sessionCount, dutyCount] = await Promise.all([
+    ParkingSession.countDocuments({
+      $or: [{ entryGateId: existing._id }, { exitGateId: existing._id }],
+    }),
+    GateDuty.countDocuments({ gateId: existing._id }),
+  ]);
+
+  if (sessionCount > 0 || dutyCount > 0) {
+    throw AppError.badRequest(
+      "This gate has attendance or parking history. Deactivate it instead of deleting.",
+      "GATE_IN_USE"
+    );
+  }
+
+  await existing.deleteOne();
+
+  await recordAudit({
+    userId: req.user!.id,
+    projectId: String(existing.projectId),
+    action: "GATE_DELETED",
+    entityType: "Gate",
+    entityId: existing._id as never,
+    metadata: { name: existing.name, type: existing.type },
+  });
+
+  res.json({ success: true });
 });

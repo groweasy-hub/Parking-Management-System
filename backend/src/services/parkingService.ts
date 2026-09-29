@@ -12,7 +12,7 @@ import {
 } from "../models";
 import { VehicleType } from "../types/enums";
 import { recordAudit } from "./auditService";
-import { getAllocationAvailability, getCompanyAvailability } from "./availabilityService";
+import { allocationVehicleTypeFor, getAllocationAvailability, getCompanyAvailability } from "./availabilityService";
 import { broadcastToProject } from "../realtime/socketServer";
 
 export interface EntryInput {
@@ -67,6 +67,7 @@ async function assertEntityInProject(
  */
 export async function createEntry(input: EntryInput) {
   const vehicleNumber = normalizeVehicleNumber(input.vehicleNumber);
+  const allocationVehicleType = allocationVehicleTypeFor(input.vehicleType);
 
   const { company, floor } = await assertEntityInProject(input.projectId, {
     gateId: input.entryGateId,
@@ -78,13 +79,13 @@ export async function createEntry(input: EntryInput) {
     projectId: input.projectId,
     companyId: input.companyId,
     floorId: input.floorId,
-    vehicleType: input.vehicleType,
+    vehicleType: allocationVehicleType,
     status: "ACTIVE",
   }).lean();
 
   if (!allocation) {
     throw AppError.badRequest(
-      `No ${input.vehicleType} parking allocation exists for this company on this floor.`,
+      `No ${allocationVehicleType} parking allocation exists for this company on this floor.`,
       "ALLOCATION_NOT_FOUND"
     );
   }

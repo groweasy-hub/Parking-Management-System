@@ -2,10 +2,8 @@ import { Role } from "./types";
 
 export function landingPathForRole(role: Role): string {
   switch (role) {
-    case "ENTRY_GATEMAN":
-      return "/gate/entry";
-    case "EXIT_GATEMAN":
-      return "/gate/exit";
+    case "GATEKEEPER":
+      return "/gate/select";
     case "SUPER_ADMIN":
     case "PROJECT_ADMIN":
       return "/admin/dashboard";

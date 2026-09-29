@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/page-header";
-import { Plus, Loader2, ChevronUp, ChevronDown, Trash2, Layers } from "lucide-react";
+import { Plus, Loader2, ChevronUp, ChevronDown, Trash2, Layers, Car, Bike } from "lucide-react";
 
 export default function FloorsPage() {
   const { currentProjectId } = useProject();
@@ -23,6 +23,8 @@ export default function FloorsPage() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [carCapacity, setCarCapacity] = useState("0");
+  const [bikeCapacity, setBikeCapacity] = useState("0");
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
@@ -46,12 +48,21 @@ export default function FloorsPage() {
     try {
       await apiFetch("/api/floors", {
         method: "POST",
-        body: JSON.stringify({ projectId: currentProjectId, name, code }),
+        body: JSON.stringify({
+          projectId: currentProjectId,
+          name,
+          code,
+          carCapacity: Number(carCapacity) || 0,
+          bikeCapacity: Number(bikeCapacity) || 0,
+          otherCapacity: 0,
+        }),
       });
       toast.success("Floor created");
       setOpen(false);
       setName("");
       setCode("");
+      setCarCapacity("0");
+      setBikeCapacity("0");
       load();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Unable to create floor.");
@@ -69,6 +80,26 @@ export default function FloorsPage() {
       load();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Unable to update floor.");
+    }
+  }
+
+  function updateLocalCapacity(floorId: string, patch: Partial<Pick<Floor, "carCapacity" | "bikeCapacity">>) {
+    setFloors((current) => current.map((floor) => (floor._id === floorId ? { ...floor, ...patch } : floor)));
+  }
+
+  async function saveCapacity(floor: Floor) {
+    try {
+      await apiFetch(`/api/floors/${floor._id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          carCapacity: Number(floor.carCapacity) || 0,
+          bikeCapacity: Number(floor.bikeCapacity) || 0,
+        }),
+      });
+      toast.success("Parking capacity updated");
+      load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to update capacity.");
     }
   }
 
@@ -140,6 +171,16 @@ export default function FloorsPage() {
                     className="h-11 rounded-xl font-mono uppercase font-bold"
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1 text-xs font-bold"><Car className="h-3 w-3" /> Cars</Label>
+                    <Input type="number" min={0} value={carCapacity} onChange={(e) => setCarCapacity(e.target.value)} className="h-11 rounded-xl" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1 text-xs font-bold"><Bike className="h-3 w-3" /> Bikes</Label>
+                    <Input type="number" min={0} value={bikeCapacity} onChange={(e) => setBikeCapacity(e.target.value)} className="h-11 rounded-xl" />
+                  </div>
+                </div>
               </div>
               <DialogFooter className="pt-2">
                 <Button
@@ -175,10 +216,11 @@ export default function FloorsPage() {
               <Table className="hidden md:table">
                 <TableHeader className="bg-muted/30">
                   <TableRow>
-                    <TableHead className="w-16">Reorder</TableHead>
                     <TableHead>Floor Name</TableHead>
                     <TableHead>Code</TableHead>
+                    <TableHead>Capacity</TableHead>
                     <TableHead>Display Order</TableHead>
+                    <TableHead className="w-20">Reorder</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-16 text-right">Action</TableHead>
                   </TableRow>
@@ -188,6 +230,22 @@ export default function FloorsPage() {
                     .sort((a, b) => a.displayOrder - b.displayOrder)
                     .map((f) => (
                       <TableRow key={f._id} className="hover:bg-muted/40 transition">
+                        <TableCell className="font-bold text-sm">
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 font-black text-xs border border-indigo-500/20">
+                              {f.code}
+                            </div>
+                            {f.name}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono font-bold text-xs">{f.code}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <CapacityInput icon={Car} value={f.carCapacity} onChange={(value) => updateLocalCapacity(f._id, { carCapacity: value })} onBlur={() => saveCapacity(f)} />
+                            <CapacityInput icon={Bike} value={f.bikeCapacity} onChange={(value) => updateLocalCapacity(f._id, { bikeCapacity: value })} onBlur={() => saveCapacity(f)} />
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{f.displayOrder}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <button
@@ -206,16 +264,6 @@ export default function FloorsPage() {
                             </button>
                           </div>
                         </TableCell>
-                        <TableCell className="font-bold text-sm">
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 font-black text-xs border border-indigo-500/20">
-                              {f.code}
-                            </div>
-                            {f.name}
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-mono font-bold text-xs">{f.code}</TableCell>
-                        <TableCell className="font-mono text-xs">{f.displayOrder}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Switch checked={f.status === "ACTIVE"} onCheckedChange={() => toggleStatus(f)} />
@@ -270,7 +318,9 @@ export default function FloorsPage() {
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-sm font-extrabold">{f.name}</p>
-                          <p className="text-[11px] text-muted-foreground">Order: {f.displayOrder}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Cars {f.carCapacity ?? 0} | Bikes {f.bikeCapacity ?? 0}
+                          </p>
                         </div>
                       </div>
 
@@ -292,5 +342,48 @@ export default function FloorsPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function CapacityInput({
+  icon: Icon,
+  value,
+  onChange,
+  onBlur,
+}: {
+  icon: typeof Car;
+  value?: number;
+  onChange: (value: number) => void;
+  onBlur: () => void;
+}) {
+  const [draft, setDraft] = useState(String(value ?? 0));
+
+  useEffect(() => {
+    setDraft(String(value ?? 0));
+  }, [value]);
+
+  function commit() {
+    const nextValue = Number(draft) || 0;
+    setDraft(String(nextValue));
+    onChange(nextValue);
+    onBlur();
+  }
+
+  return (
+    <label className="flex items-center gap-1 rounded-lg border bg-background px-2 py-1">
+      <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+      <input
+        type="number"
+        min={0}
+        value={draft}
+        onChange={(event) => {
+          const nextDraft = event.target.value;
+          setDraft(nextDraft);
+          onChange(Number(nextDraft) || 0);
+        }}
+        onBlur={commit}
+        className="w-14 bg-transparent text-xs font-bold outline-none"
+      />
+    </label>
   );
 }

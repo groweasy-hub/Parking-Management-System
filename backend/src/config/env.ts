@@ -16,7 +16,7 @@ export const env = {
     accessSecret: required("JWT_ACCESS_SECRET"),
     refreshSecret: required("JWT_REFRESH_SECRET"),
     accessTtl: process.env.JWT_ACCESS_TTL ?? "15m",
-    refreshTtl: process.env.JWT_REFRESH_TTL ?? "7d",
+    refreshTtl: process.env.JWT_REFRESH_TTL ?? "45d",
   },
   cookieDomain: process.env.COOKIE_DOMAIN ?? "localhost",
   corsOrigin: (process.env.CORS_ORIGIN ?? "http://localhost:3000").split(","),
@@ -24,6 +24,9 @@ export const env = {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME ?? "",
     apiKey: process.env.CLOUDINARY_API_KEY ?? "",
     apiSecret: process.env.CLOUDINARY_API_SECRET ?? "",
+  },
+  notifications: {
+    passwordResetWebhookUrl: process.env.PASSWORD_RESET_WEBHOOK_URL ?? "",
   },
   seed: {
     superAdminEmail: process.env.SEED_SUPER_ADMIN_EMAIL ?? "admin@parking.local",

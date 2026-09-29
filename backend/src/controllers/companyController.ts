@@ -13,11 +13,19 @@ export const createCompanySchema = z.object({
   name: z.string().min(1),
   // The building floor the company's office is on — NOT a parking floor.
   officeFloor: z.string().max(50).optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  phone: z.string().max(30).optional(),
+  serviceType: z.string().max(100).optional(),
+  address: z.string().max(300).optional(),
 });
 
 export const updateCompanySchema = z.object({
   name: z.string().min(1).optional(),
   officeFloor: z.string().max(50).optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  phone: z.string().max(30).optional(),
+  serviceType: z.string().max(100).optional(),
+  address: z.string().max(300).optional(),
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
 });
 
@@ -53,6 +61,10 @@ export const createCompany = asyncHandler(async (req: Request, res: Response) =>
     name: data.name,
     code,
     officeFloor: data.officeFloor,
+    email: data.email || undefined,
+    phone: data.phone,
+    serviceType: data.serviceType,
+    address: data.address,
     status: "ACTIVE",
   });
 

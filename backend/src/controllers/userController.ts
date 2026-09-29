@@ -2,31 +2,61 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
-import { User, Gate } from "../models";
+import { User } from "../models";
 import { ROLES } from "../types/enums";
 import { ensureProjectAccess } from "../middleware/auth";
 import { recordAudit } from "../services/auditService";
 import { hashPassword } from "../utils/password";
+import { sanitizeEmail, sanitizeHumanName, sanitizePassword, sanitizePhone } from "../utils/sanitize";
+
+const GENERIC_REGISTRATION_ERROR = "Unable to complete registration.";
 
 export const createUserSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().email(),
-  phone: z.string().optional(),
-  password: z.string().min(8),
+  name: z.preprocess(
+    (value) => (typeof value === "string" ? sanitizeHumanName(value) : value),
+    z.string().min(2).max(80)
+  ),
+  email: z.preprocess(
+    (value) => (typeof value === "string" ? sanitizeEmail(value) : value),
+    z.string().min(5).max(254).email()
+  ),
+  phone: z.preprocess(
+    (value) => (typeof value === "string" ? sanitizePhone(value) : value),
+    z.string().max(25).optional()
+  ),
+  password: z.preprocess(
+    (value) => (typeof value === "string" ? sanitizePassword(value) : value),
+    z.string().min(8).max(128)
+  ),
   role: z.enum(ROLES),
+  customRoleLabel: z.preprocess(
+    (value) => (typeof value === "string" ? sanitizeHumanName(value) : value),
+    z.string().max(60).optional()
+  ),
   projectId: z.string().nullable().optional(),
-  gateId: z.string().nullable().optional(),
 });
 
 export const updateUserSchema = z.object({
-  name: z.string().min(1).optional(),
-  phone: z.string().optional(),
-  gateId: z.string().nullable().optional(),
+  name: z.preprocess(
+    (value) => (typeof value === "string" ? sanitizeHumanName(value) : value),
+    z.string().min(2).max(80).optional()
+  ),
+  phone: z.preprocess(
+    (value) => (typeof value === "string" ? sanitizePhone(value) : value),
+    z.string().max(25).optional()
+  ),
+  customRoleLabel: z.preprocess(
+    (value) => (typeof value === "string" ? sanitizeHumanName(value) : value),
+    z.string().max(60).optional()
+  ),
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
-  password: z.string().min(8).optional(),
+  password: z.preprocess(
+    (value) => (typeof value === "string" ? sanitizePassword(value) : value),
+    z.string().min(8).max(128).optional()
+  ),
 });
 
-const PROJECT_ADMIN_CREATABLE_ROLES = ["ENTRY_GATEMAN", "EXIT_GATEMAN", "VIEWER"];
+const PROJECT_ADMIN_CREATABLE_ROLES = ["GATEKEEPER", "VIEWER"];
 
 export const listUsers = asyncHandler(async (req: Request, res: Response) => {
   const requester = req.user!;
@@ -38,7 +68,6 @@ export const listUsers = asyncHandler(async (req: Request, res: Response) => {
     filter.projectId = requester.projectId;
   }
   if (req.query.role) filter.role = req.query.role;
-  if (req.query.gateId) filter.gateId = req.query.gateId;
 
   const users = await User.find(filter).sort({ createdAt: -1 }).lean();
   res.json({ users });
@@ -60,13 +89,8 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
   }
   if (data.projectId) ensureProjectAccess(requester, data.projectId);
 
-  if (data.gateId) {
-    const gate = await Gate.findOne({ _id: data.gateId, projectId: data.projectId }).lean();
-    if (!gate) throw AppError.badRequest("Gate not found for this project.");
-  }
-
   const existing = await User.findOne({ email: data.email.toLowerCase() }).lean();
-  if (existing) throw AppError.conflict("A user with this email already exists.");
+  if (existing) throw AppError.conflict(GENERIC_REGISTRATION_ERROR, "REGISTRATION_FAILED");
 
   const passwordHash = await hashPassword(data.password);
   const user = await User.create({
@@ -75,8 +99,10 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
     phone: data.phone,
     passwordHash,
     role: data.role,
+    customRoleLabel: data.customRoleLabel,
+    mustChangePassword: data.role === "GATEKEEPER",
     projectId: data.role === "SUPER_ADMIN" ? null : data.projectId,
-    gateId: data.gateId ?? null,
+    gateId: null,
     status: "ACTIVE",
   });
 
@@ -95,8 +121,10 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      customRoleLabel: user.customRoleLabel,
+      mustChangePassword: user.mustChangePassword,
       projectId: user.projectId,
-      gateId: user.gateId,
+      gateId: null,
       status: user.status,
     },
   });
@@ -105,16 +133,19 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
 export const updateUser = asyncHandler(async (req: Request, res: Response) => {
   const requester = req.user!;
   const existing = await User.findById(req.params.id);
-  if (!existing) throw AppError.notFound("User not found.");
+  if (!existing) throw AppError.notFound("Unable to update user.", "USER_UPDATE_FAILED");
   if (existing.projectId) ensureProjectAccess(requester, String(existing.projectId));
   else if (requester.role !== "SUPER_ADMIN") throw AppError.forbidden();
 
   const data = req.body as z.infer<typeof updateUserSchema>;
-  if (data.gateId !== undefined) existing.gateId = data.gateId as never;
   if (data.name !== undefined) existing.name = data.name;
   if (data.phone !== undefined) existing.phone = data.phone;
+  if (data.customRoleLabel !== undefined) existing.customRoleLabel = data.customRoleLabel;
   if (data.status !== undefined) existing.status = data.status;
-  if (data.password) existing.passwordHash = await hashPassword(data.password);
+  if (data.password) {
+    existing.passwordHash = await hashPassword(data.password);
+    existing.mustChangePassword = existing.role === "GATEKEEPER";
+  }
 
   await existing.save();
 
@@ -133,6 +164,8 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
       name: existing.name,
       email: existing.email,
       role: existing.role,
+      customRoleLabel: existing.customRoleLabel,
+      mustChangePassword: existing.mustChangePassword,
       projectId: existing.projectId,
       gateId: existing.gateId,
       status: existing.status,

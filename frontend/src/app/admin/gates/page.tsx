@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
 import { useProject } from "@/lib/project-context";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -16,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
-import { Plus, Loader2, DoorOpen, ArrowDownToLine, ArrowUpFromLine, ExternalLink } from "lucide-react";
+import { Plus, Loader2, DoorOpen, ArrowDownToLine, ArrowUpFromLine, Pencil, Trash2 } from "lucide-react";
 
 export default function GatesPage() {
   const { currentProjectId } = useProject();
@@ -26,6 +25,10 @@ export default function GatesPage() {
   const [name, setName] = useState("");
   const [type, setType] = useState<"ENTRY" | "EXIT">("ENTRY");
   const [submitting, setSubmitting] = useState(false);
+  const [editingGate, setEditingGate] = useState<Gate | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editType, setEditType] = useState<"ENTRY" | "EXIT">("ENTRY");
+  const [deleteTarget, setDeleteTarget] = useState<Gate | null>(null);
 
   const load = useCallback(async () => {
     if (!currentProjectId) return;
@@ -70,6 +73,45 @@ export default function GatesPage() {
       load();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Unable to update gate.");
+    }
+  }
+
+  function openEdit(gate: Gate) {
+    setEditingGate(gate);
+    setEditName(gate.name);
+    setEditType(gate.type);
+  }
+
+  async function handleUpdate() {
+    if (!editingGate || !editName) return;
+    setSubmitting(true);
+    try {
+      await apiFetch(`/api/gates/${editingGate._id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: editName, type: editType }),
+      });
+      toast.success("Gate updated successfully");
+      setEditingGate(null);
+      load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to update gate.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setSubmitting(true);
+    try {
+      await apiFetch(`/api/gates/${deleteTarget._id}`, { method: "DELETE" });
+      toast.success("Gate deleted successfully");
+      setDeleteTarget(null);
+      load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to delete gate.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -153,7 +195,7 @@ export default function GatesPage() {
                     <TableHead>Gate Name</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="w-28 text-right">Console</TableHead>
+                    <TableHead className="text-right">Manage</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -193,12 +235,20 @@ export default function GatesPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Link
-                          href={g.type === "ENTRY" ? "/gate/entry" : "/gate/exit"}
-                          className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
-                        >
-                          Open <ExternalLink className="h-3 w-3" />
-                        </Link>
+                        <div className="flex justify-end gap-1.5">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => openEdit(g)} aria-label={`Edit ${g.name}`}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => setDeleteTarget(g)}
+                            aria-label={`Delete ${g.name}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -235,18 +285,84 @@ export default function GatesPage() {
 
                 <div className="flex shrink-0 items-center gap-2.5">
                   <Switch checked={g.status === "ACTIVE"} onCheckedChange={() => toggleStatus(g)} />
-                  <Link
-                    href={g.type === "ENTRY" ? "/gate/entry" : "/gate/exit"}
-                    className="p-2 rounded-xl bg-muted text-foreground text-xs font-bold hover:bg-muted/80"
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => openEdit(g)} aria-label={`Edit ${g.name}`}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setDeleteTarget(g)}
+                    aria-label={`Delete ${g.name}`}
                   >
-                    Open
-                  </Link>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             ))}
           </div>
         </>
       )}
+
+      <Dialog open={!!editingGate} onOpenChange={(open) => !open && setEditingGate(null)}>
+        <DialogContent className="rounded-3xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black">Edit Gate Terminal</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold">Gate Name</Label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-11 rounded-xl font-medium" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold">Terminal Type</Label>
+              <Select value={editType} onValueChange={(v) => setEditType(v as "ENTRY" | "EXIT")}>
+                <SelectTrigger className="w-full h-11 rounded-xl font-medium">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ENTRY">ENTRY GATE</SelectItem>
+                  <SelectItem value="EXIT">EXIT GATE</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={() => setEditingGate(null)} className="rounded-xl font-bold">
+              Cancel
+            </Button>
+            <Button onClick={handleUpdate} disabled={submitting || !editName} className="rounded-xl font-bold">
+              {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent className="rounded-3xl p-6 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black">Delete Gate</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2 text-sm">
+            <p>
+              Delete <span className="font-bold">{deleteTarget?.name}</span>?
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Gates with attendance or parking history cannot be deleted. Deactivate them instead.
+            </p>
+          </div>
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} className="rounded-xl font-bold">
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={submitting} className="rounded-xl font-bold">
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Delete Gate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

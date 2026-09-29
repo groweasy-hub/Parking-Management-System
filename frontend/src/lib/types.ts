@@ -1,8 +1,7 @@
 export const ROLES = [
   "SUPER_ADMIN",
   "PROJECT_ADMIN",
-  "ENTRY_GATEMAN",
-  "EXIT_GATEMAN",
+  "GATEKEEPER",
   "VIEWER",
 ] as const;
 export type Role = (typeof ROLES)[number];
@@ -20,6 +19,7 @@ export interface AuthUser {
   name: string;
   email: string;
   role: Role;
+  mustChangePassword?: boolean;
   projectId: string | null;
   gateId: string | null;
 }
@@ -41,6 +41,9 @@ export interface Floor {
   name: string;
   code: string;
   displayOrder: number;
+  carCapacity: number;
+  bikeCapacity: number;
+  otherCapacity: number;
   status: EntityStatus;
 }
 
@@ -51,6 +54,10 @@ export interface Company {
   code: string;
   /** The building floor the company's office is on — NOT a parking floor. */
   officeFloor?: string;
+  email?: string;
+  phone?: string;
+  serviceType?: string;
+  address?: string;
   logoUrl?: string;
   status: EntityStatus;
 }
@@ -81,6 +88,7 @@ export interface AppUser {
   email: string;
   phone?: string;
   role: Role;
+  customRoleLabel?: string;
   projectId: string | null;
   gateId: string | null;
   status: EntityStatus;

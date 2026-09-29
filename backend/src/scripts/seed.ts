@@ -69,7 +69,7 @@ async function upsertUser(params: {
   name: string;
   email: string;
   password: string;
-  role: "SUPER_ADMIN" | "PROJECT_ADMIN" | "ENTRY_GATEMAN" | "EXIT_GATEMAN" | "VIEWER";
+  role: "SUPER_ADMIN" | "PROJECT_ADMIN" | "GATEKEEPER" | "VIEWER";
   projectId?: mongoose.Types.ObjectId | null;
   gateId?: mongoose.Types.ObjectId | null;
 }) {
@@ -123,9 +123,9 @@ async function main() {
   await upsertAllocation(project._id as mongoose.Types.ObjectId, pqr._id as mongoose.Types.ObjectId, b3._id as mongoose.Types.ObjectId, "CAR", 5, false);
   console.log("[seed] Parking allocations ready");
 
-  const gate1 = await upsertGate(project._id as mongoose.Types.ObjectId, "Gate 1", "ENTRY");
+  await upsertGate(project._id as mongoose.Types.ObjectId, "Gate 1", "ENTRY");
   await upsertGate(project._id as mongoose.Types.ObjectId, "Gate 2", "ENTRY");
-  const gate3 = await upsertGate(project._id as mongoose.Types.ObjectId, "Gate 3", "EXIT");
+  await upsertGate(project._id as mongoose.Types.ObjectId, "Gate 3", "EXIT");
   console.log("[seed] Gates ready");
 
   await upsertUser({
@@ -136,20 +136,11 @@ async function main() {
     projectId: project._id as mongoose.Types.ObjectId,
   });
   await upsertUser({
-    name: "Entry Gateman",
-    email: "entry@parking.local",
+    name: "Gate Keeper",
+    email: "gatekeeper@parking.local",
     password: "ChangeMe123!",
-    role: "ENTRY_GATEMAN",
+    role: "GATEKEEPER",
     projectId: project._id as mongoose.Types.ObjectId,
-    gateId: gate1._id as mongoose.Types.ObjectId,
-  });
-  await upsertUser({
-    name: "Exit Gateman",
-    email: "exit@parking.local",
-    password: "ChangeMe123!",
-    role: "EXIT_GATEMAN",
-    projectId: project._id as mongoose.Types.ObjectId,
-    gateId: gate3._id as mongoose.Types.ObjectId,
   });
   await upsertUser({
     name: "Viewer",
@@ -159,13 +150,7 @@ async function main() {
     projectId: project._id as mongoose.Types.ObjectId,
   });
   console.log("[seed] Demo users ready");
-
-  console.log("\n--- Demo credentials (change these before production) ---");
-  console.log(`Super Admin:    ${env.seed.superAdminEmail} / ${env.seed.superAdminPassword}`);
-  console.log("Project Admin:  projectadmin@parking.local / ChangeMe123!");
-  console.log("Entry Gateman:  entry@parking.local / ChangeMe123!");
-  console.log("Exit Gateman:   exit@parking.local / ChangeMe123!");
-  console.log("Viewer:         viewer@parking.local / ChangeMe123!");
+  console.log("[seed] Credentials are configured through environment/seed inputs and are not printed.");
 
   await mongoose.disconnect();
   console.log("[seed] Done.");

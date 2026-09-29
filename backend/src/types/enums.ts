@@ -1,8 +1,7 @@
 export const ROLES = [
   "SUPER_ADMIN",
   "PROJECT_ADMIN",
-  "ENTRY_GATEMAN",
-  "EXIT_GATEMAN",
+  "GATEKEEPER",
   "VIEWER",
 ] as const;
 export type Role = (typeof ROLES)[number];

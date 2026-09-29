@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
+import { gatekeeperSecurityPath } from "@/lib/gate-security";
 import { landingPathForRole } from "@/lib/roles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,29 +16,22 @@ import {
   Car,
   ShieldCheck,
   Radio,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  Zap,
+  Eye,
+  EyeOff,
 } from "lucide-react";
-
-const DEMO_USERS = [
-  { role: "Super Admin", email: "admin@parking.local", password: "ChangeMe123!", icon: ShieldCheck, badge: "Admin" },
-  { role: "Entry Gateman", email: "entry@parking.local", password: "ChangeMe123!", icon: ArrowDownToLine, badge: "Entry" },
-  { role: "Exit Gateman", email: "exit@parking.local", password: "ChangeMe123!", icon: ArrowUpFromLine, badge: "Exit" },
-  { role: "Project Admin", email: "projectadmin@parking.local", password: "ChangeMe123!", icon: ParkingSquare, badge: "Manager" },
-];
 
 export default function LoginPage() {
   const { user, loading, login } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace(landingPathForRole(user.role));
+      router.replace(gatekeeperSecurityPath(user) ?? landingPathForRole(user.role));
     }
   }, [user, loading, router]);
 
@@ -47,18 +41,12 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       const loggedInUser = await login(email, password);
-      router.replace(landingPathForRole(loggedInUser.role));
+      router.replace(gatekeeperSecurityPath(loggedInUser) ?? landingPathForRole(loggedInUser.role));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unable to sign in. Please try again.");
     } finally {
       setSubmitting(false);
     }
-  }
-
-  function handleQuickLogin(demoEmail: string, demoPass: string) {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setError(null);
   }
 
   return (
@@ -102,7 +90,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right Form panel */}
-      <div className="flex w-full flex-1 flex-col items-center justify-center bg-background px-4 py-8 sm:px-8 lg:w-1/2">
+      <div className="flex w-full flex-1 flex-col items-center justify-center bg-background px-4 py-8 text-foreground sm:px-8 lg:w-1/2">
         <div className="w-full max-w-md space-y-6">
           {/* Mobile branding header */}
           <div className="space-y-2 text-center lg:hidden">
@@ -120,35 +108,6 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Quick Demo Access Pills */}
-          <div className="rounded-2xl border bg-muted/30 p-3.5 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
-                <Zap className="h-3.5 w-3.5 text-amber-500" /> Quick Demo Login
-              </span>
-              <span className="text-[11px] text-muted-foreground">Tap to auto-fill</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-1.5">
-              {DEMO_USERS.map((demo) => (
-                <button
-                  key={demo.role}
-                  type="button"
-                  onClick={() => handleQuickLogin(demo.email, demo.password)}
-                  className="flex items-center gap-2 p-2 rounded-xl border bg-card hover:border-primary/60 hover:bg-primary/5 text-left transition tap-bounce shadow-xs"
-                >
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <demo.icon className="h-3.5 w-3.5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold truncate leading-tight">{demo.role}</p>
-                    <p className="text-[10px] text-muted-foreground font-mono truncate">{demo.badge}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <Alert variant="destructive" className="rounded-xl">
@@ -163,7 +122,7 @@ export default function LoginPage() {
                 type="email"
                 autoComplete="username"
                 required
-                className="h-12 rounded-xl text-sm font-medium border-2"
+                className="h-12 rounded-xl border-2 bg-card text-sm font-medium text-foreground placeholder:text-muted-foreground"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="operator@parking.local"
@@ -172,16 +131,27 @@ export default function LoginPage() {
 
             <div className="space-y-1.5">
               <Label htmlFor="password" className="text-xs font-bold">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="h-12 rounded-xl text-sm font-medium border-2"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  className="h-12 rounded-xl border-2 bg-card pr-11 text-sm font-medium text-foreground placeholder:text-muted-foreground"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-              />
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
             <Button

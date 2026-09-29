@@ -19,10 +19,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
-  ArrowDownToLine,
-  ArrowUpFromLine,
 } from "lucide-react";
-import Link from "next/link";
 
 interface Summary {
   totalCapacity: number;
@@ -32,6 +29,7 @@ interface Summary {
 }
 
 interface FloorVehicleBreakdown {
+  allocationId: string;
   vehicleType: VehicleType;
   capacity: number;
   occupied: number;
@@ -48,6 +46,7 @@ interface FloorDashboardEntry {
 }
 
 interface CompanyAllocationRow {
+  allocationId: string;
   floorId: string;
   floorName: string;
   floorCode: string;
@@ -139,18 +138,30 @@ export default function AdminDashboardPage() {
       .catch((err) => console.error("Failed to load companies", err));
   }, [currentProjectId]);
 
+  useEffect(() => {
+    if (!selectedCompanyId) return;
+    const selectedCompany = companies.find((company) => company._id === selectedCompanyId);
+    if (!selectedCompany || selectedCompany.projectId !== currentProjectId) {
+      setSelectedCompanyId(companies[0]?._id ?? "");
+      setCompanyRows([]);
+    }
+  }, [companies, currentProjectId, selectedCompanyId]);
+
   const loadCompany = useCallback(async () => {
     if (!currentProjectId || !selectedCompanyId) return;
+    const selectedCompany = companies.find((company) => company._id === selectedCompanyId);
+    if (!selectedCompany || selectedCompany.projectId !== currentProjectId) return;
+
     try {
       const data = await apiFetch<{ allocations: CompanyAllocationRow[] }>(
-        `/api/dashboard/company?projectId=${currentProjectId}&companyId=${selectedCompanyId}`
+        `/api/dashboard/company?projectId=${encodeURIComponent(currentProjectId)}&companyId=${encodeURIComponent(selectedCompanyId)}`
       );
       setCompanyRows(data.allocations);
     } catch (err) {
       console.error("Failed to load company parking", err);
       setCompanyRows([]);
     }
-  }, [currentProjectId, selectedCompanyId]);
+  }, [companies, currentProjectId, selectedCompanyId]);
 
   useEffect(() => {
     loadCompany();
@@ -190,23 +201,6 @@ export default function AdminDashboardPage() {
           </p>
         </div>
 
-        {/* Quick Gate Launchers */}
-        <div className="flex items-center gap-2">
-          <Link
-            href="/gate/entry"
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold transition tap-bounce shadow-xs"
-          >
-            <ArrowDownToLine className="h-4 w-4" />
-            Entry Terminal
-          </Link>
-          <Link
-            href="/gate/exit"
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-bold transition tap-bounce shadow-xs"
-          >
-            <ArrowUpFromLine className="h-4 w-4" />
-            Exit Terminal
-          </Link>
-        </div>
       </div>
 
       {/* Main Status Hero Banner */}
@@ -333,7 +327,7 @@ export default function AdminDashboardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   {floor.vehicleTypes.map((vt) => (
                     <VehicleTile
-                      key={vt.vehicleType}
+                      key={vt.allocationId}
                       vehicleType={vt.vehicleType}
                       capacity={vt.capacity}
                       occupied={vt.occupied}
@@ -348,7 +342,7 @@ export default function AdminDashboardPage() {
 
           {floors.length === 0 && (
             <div className="py-12 text-center text-muted-foreground">
-              No parking floors created yet. Go to Floors to add parking levels.
+              No parking floors created yet. Go to Parking Floors to add parking levels.
             </div>
           )}
         </CardContent>
@@ -388,7 +382,7 @@ export default function AdminDashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {companyRows.map((row) => (
                 <VehicleTile
-                  key={`${row.floorId}-${row.vehicleType}`}
+                  key={row.allocationId}
                   vehicleType={row.vehicleType}
                   capacity={row.capacity}
                   occupied={row.occupied}

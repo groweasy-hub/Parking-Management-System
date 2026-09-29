@@ -13,6 +13,10 @@ export function computeStatus(capacity: number, occupied: number): AvailabilityS
   return "AVAILABLE";
 }
 
+export function allocationVehicleTypeFor(vehicleType: string) {
+  return vehicleType === "OTHER" ? "CAR" : vehicleType;
+}
+
 export interface AllocationAvailability {
   allocationId: string;
   floorId: string;
@@ -37,10 +41,11 @@ export async function getCompanyAvailability(
   vehicleType: string,
   floorId?: string
 ): Promise<AllocationAvailability[]> {
+  const allocationVehicleType = allocationVehicleTypeFor(vehicleType);
   const filter: Record<string, unknown> = {
     projectId: new Types.ObjectId(projectId),
     companyId: new Types.ObjectId(companyId),
-    vehicleType,
+    vehicleType: allocationVehicleType,
     status: "ACTIVE",
   };
   if (floorId) filter.floorId = new Types.ObjectId(floorId);

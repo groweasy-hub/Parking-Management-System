@@ -11,12 +11,18 @@ export const createFloorSchema = z.object({
   name: z.string().min(1),
   code: z.string().min(1).max(10),
   displayOrder: z.number().int().optional(),
+  carCapacity: z.number().int().min(0).optional(),
+  bikeCapacity: z.number().int().min(0).optional(),
+  otherCapacity: z.number().int().min(0).optional(),
 });
 
 export const updateFloorSchema = z.object({
   name: z.string().min(1).optional(),
   code: z.string().min(1).max(10).optional(),
   displayOrder: z.number().int().optional(),
+  carCapacity: z.number().int().min(0).optional(),
+  bikeCapacity: z.number().int().min(0).optional(),
+  otherCapacity: z.number().int().min(0).optional(),
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
 });
 
@@ -45,6 +51,9 @@ export const createFloor = asyncHandler(async (req: Request, res: Response) => {
     name: data.name,
     code: data.code.toUpperCase(),
     displayOrder,
+    carCapacity: data.carCapacity ?? 0,
+    bikeCapacity: data.bikeCapacity ?? 0,
+    otherCapacity: data.otherCapacity ?? 0,
     status: "ACTIVE",
   });
 

@@ -48,6 +48,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    if (typeof window !== "undefined") {
+      Object.keys(window.sessionStorage)
+        .filter((key) => key.startsWith("parkflow:mpin-unlocked:"))
+        .forEach((key) => window.sessionStorage.removeItem(key));
+    }
     setUser(null);
   }, []);
 

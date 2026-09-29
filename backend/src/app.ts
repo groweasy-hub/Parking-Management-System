@@ -24,6 +24,7 @@ import dashboardRoutes from "./routes/dashboardRoutes";
 import reportRoutes from "./routes/reportRoutes";
 import auditRoutes from "./routes/auditRoutes";
 import settingsRoutes from "./routes/settingsRoutes";
+import gateDutyRoutes from "./routes/gateDutyRoutes";
 
 export function createApp() {
   const app = express();
@@ -62,6 +63,7 @@ export function createApp() {
   app.use("/api/reports", reportRoutes);
   app.use("/api/audit-logs", auditRoutes);
   app.use("/api/settings", settingsRoutes);
+  app.use("/api/gate-duty", gateDutyRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

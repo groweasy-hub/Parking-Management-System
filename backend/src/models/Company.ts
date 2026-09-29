@@ -7,6 +7,10 @@ export interface ICompany extends Document {
   code: string;
   /** The building floor the company's office occupies — NOT a parking floor. */
   officeFloor?: string;
+  email?: string;
+  phone?: string;
+  serviceType?: string;
+  address?: string;
   logoUrl?: string;
   logoStorageId?: string;
   status: EntityStatus;
@@ -20,6 +24,10 @@ const companySchema = new Schema<ICompany>(
     name: { type: String, required: true, trim: true },
     code: { type: String, required: true, trim: true, uppercase: true },
     officeFloor: { type: String, trim: true },
+    email: { type: String, trim: true, lowercase: true },
+    phone: { type: String, trim: true },
+    serviceType: { type: String, trim: true },
+    address: { type: String, trim: true },
     logoUrl: { type: String },
     logoStorageId: { type: String },
     status: { type: String, enum: ENTITY_STATUSES, default: "ACTIVE" },

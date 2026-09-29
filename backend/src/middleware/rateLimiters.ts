@@ -1,11 +1,12 @@
 import rateLimit from "express-rate-limit";
 
 export const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 20,
+  windowMs: 60 * 1000,
+  limit: 10,
+  statusCode: 401,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: { message: "Too many login attempts. Please try again later.", code: "RATE_LIMITED" } },
+  message: { error: { message: "Incorrect email or password", code: "INVALID_CREDENTIALS" } },
 });
 
 export const gateOperationLimiter = rateLimit({

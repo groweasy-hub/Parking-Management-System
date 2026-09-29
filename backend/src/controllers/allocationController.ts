@@ -2,17 +2,18 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
-import { ParkingAllocation, Occupancy, ParkingSession } from "../models";
-import { VEHICLE_TYPES } from "../types/enums";
+import { Floor, ParkingAllocation, Occupancy, ParkingSession } from "../models";
 import { ensureProjectAccess } from "../middleware/auth";
 import { recordAudit } from "../services/auditService";
 import { runInTransaction } from "../utils/transaction";
+
+const ALLOCATABLE_VEHICLE_TYPES = ["CAR", "BIKE"] as const;
 
 export const createAllocationSchema = z.object({
   projectId: z.string().min(1),
   companyId: z.string().min(1),
   floorId: z.string().min(1),
-  vehicleType: z.enum(VEHICLE_TYPES),
+  vehicleType: z.enum(ALLOCATABLE_VEHICLE_TYPES),
   capacity: z.number().int().min(0),
   preferred: z.boolean().optional(),
 });
@@ -22,6 +23,41 @@ export const updateAllocationSchema = z.object({
   preferred: z.boolean().optional(),
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
 });
+
+function capacityFieldFor(vehicleType: string) {
+  if (vehicleType === "CAR") return "carCapacity";
+  return "bikeCapacity";
+}
+
+async function ensureFloorCapacityAvailable(args: {
+  projectId: string;
+  floorId: string;
+  vehicleType: string;
+  requestedCapacity: number;
+  excludeAllocationId?: string;
+}) {
+  const floor = await Floor.findOne({ _id: args.floorId, projectId: args.projectId }).lean();
+  if (!floor) throw AppError.notFound("Parking floor not found.");
+
+  const capacityField = capacityFieldFor(args.vehicleType) as "carCapacity" | "bikeCapacity";
+  const floorCapacity = floor[capacityField] ?? 0;
+  const filter: Record<string, unknown> = {
+    projectId: args.projectId,
+    floorId: args.floorId,
+    vehicleType: args.vehicleType,
+    status: "ACTIVE",
+  };
+  if (args.excludeAllocationId) filter._id = { $ne: args.excludeAllocationId };
+
+  const existingAllocations = await ParkingAllocation.find(filter).lean();
+  const alreadyAllocated = existingAllocations.reduce((sum, allocation) => sum + allocation.capacity, 0);
+  if (alreadyAllocated + args.requestedCapacity > floorCapacity) {
+    throw AppError.badRequest(
+      `Only ${Math.max(0, floorCapacity - alreadyAllocated)} ${args.vehicleType.toLowerCase()} spaces are available on ${floor.code}.`,
+      "FLOOR_CAPACITY_EXCEEDED"
+    );
+  }
+}
 
 export const listAllocations = asyncHandler(async (req: Request, res: Response) => {
   const projectId = req.query.projectId as string | undefined;
@@ -63,6 +99,13 @@ export const createAllocation = asyncHandler(async (req: Request, res: Response)
       "ALLOCATION_EXISTS"
     );
   }
+
+  await ensureFloorCapacityAvailable({
+    projectId: data.projectId,
+    floorId: data.floorId,
+    vehicleType: data.vehicleType,
+    requestedCapacity: data.capacity,
+  });
 
   const allocation = await runInTransaction(async (session) => {
     const [created] = await ParkingAllocation.create(
@@ -128,6 +171,13 @@ export const updateAllocation = asyncHandler(async (req: Request, res: Response)
         "CAPACITY_BELOW_OCCUPANCY"
       );
     }
+    await ensureFloorCapacityAvailable({
+      projectId: String(existing.projectId),
+      floorId: String(existing.floorId),
+      vehicleType: existing.vehicleType,
+      requestedCapacity: data.capacity,
+      excludeAllocationId: String(existing._id),
+    });
   }
 
   await runInTransaction(async (session) => {

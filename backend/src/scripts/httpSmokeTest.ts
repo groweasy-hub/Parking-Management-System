@@ -70,7 +70,7 @@ async function main() {
     name: "HTTP Entry",
     email: "httpentry@smoke.local",
     passwordHash: await hashPassword("Password123!"),
-    role: "ENTRY_GATEMAN",
+    role: "GATEKEEPER",
     projectId: project._id,
     gateId: entryGate._id,
     status: "ACTIVE",
@@ -79,7 +79,7 @@ async function main() {
     name: "HTTP Exit",
     email: "httpexit@smoke.local",
     passwordHash: await hashPassword("Password123!"),
-    role: "EXIT_GATEMAN",
+    role: "GATEKEEPER",
     projectId: project._id,
     gateId: exitGate._id,
     status: "ACTIVE",
@@ -101,20 +101,20 @@ async function main() {
   });
   extractCookies(loginRes, jar);
   const loginBody = (await loginRes.json()) as { user: { role: string } };
-  check("login returns 200 and correct role", loginRes.status === 200 && loginBody.user.role === "ENTRY_GATEMAN");
+  check("login returns 200 and correct role", loginRes.status === 200 && loginBody.user.role === "GATEKEEPER");
   check("login sets an accessToken cookie", jar.has("accessToken"));
 
   // --- Unauthenticated request is rejected ---
   const unauthedRes = await fetch(`${base}/api/parking/active?projectId=${project._id}`);
   check("request without cookie is rejected with 401", unauthedRes.status === 401);
 
-  // --- Wrong password rejected without leaking which field was wrong ---
+  // --- Failed login rejected without leaking which field was wrong ---
   const badLoginRes = await fetch(`${base}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: entryUser.email, password: "wrong" }),
+    body: JSON.stringify({ email: entryUser.email, password: "Wrong123!" }),
   });
-  check("wrong password rejected with 401", badLoginRes.status === 401);
+  check("failed login rejected with 401", badLoginRes.status === 401);
 
   // --- Availability check ---
   const availRes = await fetch(
@@ -199,3 +199,4 @@ main().catch((err) => {
   console.error("HTTP smoke test crashed", err);
   process.exit(1);
 });
+

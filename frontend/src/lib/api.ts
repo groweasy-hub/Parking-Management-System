@@ -1,4 +1,10 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const DEFAULT_API_URL = "http://localhost:4000";
+
+function normalizeApiUrl(value: string | undefined): string {
+  return (value?.trim() || DEFAULT_API_URL).replace(/\/+$/, "");
+}
+
+const API_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
 
 export class ApiError extends Error {
   code: string;
@@ -14,7 +20,7 @@ let refreshPromise: Promise<boolean> | null = null;
 
 async function tryRefresh(): Promise<boolean> {
   if (!refreshPromise) {
-    refreshPromise = fetch(`${API_URL}/api/auth/refresh`, {
+    refreshPromise = fetch(apiUrl("/api/auth/refresh"), {
       method: "POST",
       credentials: "include",
     })
@@ -35,7 +41,7 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
   const { skipRefreshRetry, ...init } = options;
   const isFormData = init.body instanceof FormData;
 
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(apiUrl(path), {
     ...init,
     credentials: "include",
     headers: {
@@ -74,7 +80,7 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
 }
 
 export function apiUrl(path: string): string {
-  return `${API_URL}${path}`;
+  return `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 export { API_URL };

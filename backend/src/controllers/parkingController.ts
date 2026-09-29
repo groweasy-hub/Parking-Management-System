@@ -2,11 +2,11 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
-import { Company } from "../models";
+import { Company, GateDuty } from "../models";
 import { ParkingSession } from "../models";
 import { VEHICLE_TYPES, SESSION_STATUSES } from "../types/enums";
 import { ensureProjectAccess } from "../middleware/auth";
-import { getCompanyAvailability } from "../services/availabilityService";
+import { allocationVehicleTypeFor, getCompanyAvailability } from "../services/availabilityService";
 import { createEntry, completeExit } from "../services/parkingService";
 
 export const availabilityQuerySchema = z.object({
@@ -41,8 +41,9 @@ export const getAvailability = asyncHandler(async (req: Request, res: Response) 
 
   const allocations = await getCompanyAvailability(projectId, companyId, vehicleType, floorId);
   if (allocations.length === 0) {
+    const allocationVehicleType = allocationVehicleTypeFor(vehicleType);
     throw AppError.notFound(
-      `No parking allocation exists for this company for ${vehicleType}.`,
+      `No parking allocation exists for this company for ${allocationVehicleType}.`,
       "ALLOCATION_NOT_FOUND"
     );
   }
@@ -54,11 +55,12 @@ export const createEntryHandler = asyncHandler(async (req: Request, res: Respons
   const data = req.body as z.infer<typeof entrySchema>;
   ensureProjectAccess(req.user!, data.projectId);
 
-  if (req.user!.role !== "SUPER_ADMIN" && req.user!.role !== "ENTRY_GATEMAN") {
+  if (req.user!.role !== "GATEKEEPER") {
     throw AppError.forbidden("Only entry gate staff can record vehicle entries.");
   }
-  if (req.user!.role === "ENTRY_GATEMAN" && req.user!.gateId && req.user!.gateId !== data.entryGateId) {
-    throw AppError.forbidden("You are not assigned to this gate.");
+  const duty = await GateDuty.findOne({ userId: req.user!.id, dutyDate: new Date().toISOString().slice(0, 10) }).lean();
+  if (!duty || duty.gateType !== "ENTRY" || String(duty.gateId) !== data.entryGateId) {
+    throw AppError.forbidden("Please select today's entry gate before recording entries.");
   }
 
   const { session, availability } = await createEntry({
@@ -70,6 +72,8 @@ export const createEntryHandler = asyncHandler(async (req: Request, res: Respons
     entryGateId: data.entryGateId,
     entryUserId: req.user!.id,
   });
+
+  await GateDuty.updateOne({ _id: duty._id }, { $inc: { entryCount: 1 } });
 
   res.status(201).json({
     session: {
@@ -87,11 +91,12 @@ export const createEntryHandler = asyncHandler(async (req: Request, res: Respons
 export const createExitHandler = asyncHandler(async (req: Request, res: Response) => {
   const data = req.body as z.infer<typeof exitSchema>;
 
-  if (req.user!.role !== "SUPER_ADMIN" && req.user!.role !== "EXIT_GATEMAN") {
+  if (req.user!.role !== "GATEKEEPER") {
     throw AppError.forbidden("Only exit gate staff can record vehicle exits.");
   }
-  if (req.user!.role === "EXIT_GATEMAN" && req.user!.gateId && req.user!.gateId !== data.exitGateId) {
-    throw AppError.forbidden("You are not assigned to this gate.");
+  const duty = await GateDuty.findOne({ userId: req.user!.id, dutyDate: new Date().toISOString().slice(0, 10) }).lean();
+  if (!duty || duty.gateType !== "EXIT" || String(duty.gateId) !== data.exitGateId) {
+    throw AppError.forbidden("Please select today's exit gate before recording exits.");
   }
 
   const targetSession = await ParkingSession.findById(data.sessionId).lean();
@@ -102,6 +107,8 @@ export const createExitHandler = asyncHandler(async (req: Request, res: Response
     exitGateId: data.exitGateId,
     exitUserId: req.user!.id,
   });
+
+  await GateDuty.updateOne({ _id: duty._id }, { $inc: { exitCount: 1 } });
 
   res.json({
     session: {

@@ -42,6 +42,7 @@ export const getFloorDashboard = asyncHandler(async (req: Request, res: Response
       const capacity = occ?.capacity ?? a.capacity;
       const occupied = occ?.occupied ?? 0;
       return {
+        allocationId: String(a._id),
         vehicleType: a.vehicleType,
         capacity,
         occupied,
@@ -87,6 +88,7 @@ export const getCompanyDashboard = asyncHandler(async (req: Request, res: Respon
     const occupied = occ?.occupied ?? 0;
     const floor = floorMap.get(String(a.floorId));
     return {
+      allocationId: String(a._id),
       floorId: String(a.floorId),
       floorName: floor?.name ?? "Unknown",
       floorCode: floor?.code ?? "?",
