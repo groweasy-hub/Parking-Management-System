@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { changePassword, login, logout, refresh, me } from "../controllers/authController";
-import { changePasswordSchema, loginSchema } from "../controllers/authController";
+import { changePassword, login, logout, refresh, me, updateProfile } from "../controllers/authController";
+import { changePasswordSchema, loginSchema, updateProfileSchema } from "../controllers/authController";
 import { validate } from "../middleware/validate";
-import { authenticate } from "../middleware/auth";
+import { authenticate, requireRole } from "../middleware/auth";
 import { loginLimiter } from "../middleware/rateLimiters";
 
 const router = Router();
@@ -20,6 +20,17 @@ router.post(
 router.post("/logout", authenticate, logout);
 router.post("/refresh", refresh);
 router.get("/me", authenticate, me);
+router.patch(
+  "/profile",
+  authenticate,
+  requireRole("SUPER_ADMIN"),
+  validate(updateProfileSchema, "body", {
+    genericMessage: "Unable to update profile.",
+    genericCode: "PROFILE_UPDATE_FAILED",
+    logLabel: "auth.updateProfile",
+  }),
+  updateProfile
+);
 router.post(
   "/change-password",
   authenticate,

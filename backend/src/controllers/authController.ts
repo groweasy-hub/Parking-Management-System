@@ -7,7 +7,7 @@ import { hashPassword } from "../utils/password";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
 import { env, isProduction } from "../config/env";
 import { recordAudit } from "../services/auditService";
-import { sanitizeEmail, sanitizePassword } from "../utils/sanitize";
+import { sanitizeEmail, sanitizeHumanName, sanitizePassword, sanitizePhone } from "../utils/sanitize";
 import {
   applyProgressiveDelay,
   clearFailedLogin,
@@ -18,6 +18,7 @@ import {
 
 const GENERIC_LOGIN_ERROR = "Incorrect email or password";
 const GENERIC_PASSWORD_CHANGE_ERROR = "Unable to change password.";
+const GENERIC_PROFILE_UPDATE_ERROR = "Unable to update profile.";
 
 export const loginSchema = z.object({
   email: z.preprocess(
@@ -40,6 +41,34 @@ export const changePasswordSchema = z.object({
     z.string().min(8).max(128)
   ),
 });
+
+export const updateProfileSchema = z
+  .object({
+    name: z.preprocess(
+      (value) => (typeof value === "string" ? sanitizeHumanName(value) : value),
+      z.string().min(2).max(80)
+    ),
+    email: z.preprocess(
+      (value) => (typeof value === "string" ? sanitizeEmail(value) : value),
+      z.string().min(5).max(254).email()
+    ),
+    phone: z.preprocess(
+      (value) => (typeof value === "string" ? sanitizePhone(value) : value),
+      z.string().max(25).optional()
+    ),
+    currentPassword: z.preprocess(
+      (value) => (typeof value === "string" ? sanitizePassword(value) : value),
+      z.string().max(128).optional()
+    ),
+    newPassword: z.preprocess(
+      (value) => (typeof value === "string" ? sanitizePassword(value) : value),
+      z.string().min(8).max(128).optional()
+    ),
+  })
+  .refine((data) => !data.newPassword || Boolean(data.currentPassword), {
+    path: ["currentPassword"],
+    message: "Current password is required.",
+  });
 
 // In production the frontend (Vercel) and backend typically live on
 // different registrable domains, so cookies must be SameSite=None+Secure to
@@ -73,6 +102,28 @@ function buildTokens(user: {
   });
   const refreshToken = signRefreshToken(String(user._id));
   return { accessToken, refreshToken };
+}
+
+function serializeAuthUser(user: {
+  _id: unknown;
+  name: string;
+  email: string;
+  phone?: string | null;
+  role: string;
+  mustChangePassword?: boolean;
+  projectId?: unknown;
+  gateId?: unknown;
+}) {
+  return {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone ?? "",
+    role: user.role,
+    mustChangePassword: user.mustChangePassword,
+    projectId: user.projectId,
+    gateId: user.gateId,
+  };
 }
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
@@ -117,15 +168,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   res.json({
     accessToken,
-    user: {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      mustChangePassword: user.mustChangePassword,
-      projectId: user.projectId,
-      gateId: user.gateId,
-    },
+    user: serializeAuthUser(user),
   });
 });
 
@@ -169,15 +212,7 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
   const user = await User.findById(req.user.id).lean();
   if (!user) throw AppError.unauthorized();
   res.json({
-    user: {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      mustChangePassword: user.mustChangePassword,
-      projectId: user.projectId,
-      gateId: user.gateId,
-    },
+    user: serializeAuthUser(user),
   });
 });
 
@@ -206,14 +241,54 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
   });
 
   res.json({
-    user: {
-      id: user._id,
-      name: user.name,
+    user: serializeAuthUser(user),
+  });
+});
+
+export const updateProfile = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw AppError.unauthorized();
+
+  const data = req.body as z.infer<typeof updateProfileSchema>;
+  const normalizedEmail = data.email.toLowerCase();
+
+  const user = await User.findById(req.user.id).select("+passwordHash");
+  if (!user || user.status !== "ACTIVE" || user.role !== "SUPER_ADMIN") {
+    throw AppError.badRequest(GENERIC_PROFILE_UPDATE_ERROR, "PROFILE_UPDATE_FAILED");
+  }
+
+  if (normalizedEmail !== user.email) {
+    const existing = await User.findOne({ email: normalizedEmail, _id: { $ne: user._id } }).lean();
+    if (existing) {
+      throw AppError.badRequest(GENERIC_PROFILE_UPDATE_ERROR, "PROFILE_UPDATE_FAILED");
+    }
+  }
+
+  if (data.newPassword) {
+    const { valid } = await verifyPasswordAndGetMigrationHash(data.currentPassword ?? "", user.passwordHash);
+    if (!valid) {
+      throw AppError.badRequest(GENERIC_PROFILE_UPDATE_ERROR, "PROFILE_UPDATE_FAILED");
+    }
+    user.passwordHash = await hashPassword(data.newPassword);
+    user.mustChangePassword = false;
+  }
+
+  user.name = data.name;
+  user.email = normalizedEmail;
+  user.phone = data.phone || undefined;
+  await user.save();
+
+  await recordAudit({
+    userId: String(user._id),
+    projectId: user.projectId ? String(user.projectId) : null,
+    action: "PROFILE_UPDATED",
+    entityType: "User",
+    entityId: user._id as never,
+    metadata: {
       email: user.email,
-      role: user.role,
-      mustChangePassword: user.mustChangePassword,
-      projectId: user.projectId,
-      gateId: user.gateId,
+      phoneUpdated: Boolean(user.phone),
+      passwordChanged: Boolean(data.newPassword),
     },
   });
+
+  res.json({ user: serializeAuthUser(user) });
 });
