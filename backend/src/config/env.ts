@@ -8,6 +8,28 @@ function required(name: string, fallback?: string): string {
   return value;
 }
 
+function normalizeOrigin(origin: string): string | null {
+  const trimmed = origin.trim();
+  if (!trimmed) return null;
+
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed.replace(/\/+$/, "");
+  }
+}
+
+function parseCorsOrigins(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map(normalizeOrigin)
+        .filter((origin): origin is string => Boolean(origin))
+    )
+  );
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: Number(process.env.PORT ?? 4000),
@@ -19,7 +41,7 @@ export const env = {
     refreshTtl: process.env.JWT_REFRESH_TTL ?? "45d",
   },
   cookieDomain: process.env.COOKIE_DOMAIN ?? "localhost",
-  corsOrigin: (process.env.CORS_ORIGIN ?? "http://localhost:3000").split(","),
+  corsOrigin: parseCorsOrigins(process.env.CORS_ORIGIN ?? "http://localhost:3000"),
   cloudinary: {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME ?? "",
     apiKey: process.env.CLOUDINARY_API_KEY ?? "",

@@ -35,12 +35,15 @@ export function createApp() {
   // crossOriginResourcePolicy defaults to same-origin, which would block the
   // frontend (a different origin) from rendering uploaded company logos.
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
-  app.use(
-    cors({
-      origin: env.corsOrigin,
-      credentials: true,
-    })
-  );
+  const corsOptions = {
+    origin: env.corsOrigin,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 204,
+  };
+  app.use(cors(corsOptions));
+  app.options("*", cors(corsOptions));
   app.use(cookieParser());
   app.use(express.json({ limit: "2mb" }));
   app.use(morgan(env.nodeEnv === "development" ? "dev" : "combined"));

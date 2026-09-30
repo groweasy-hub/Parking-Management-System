@@ -134,7 +134,8 @@ With both servers running and seeded data loaded:
   URL.
 - **Backend**: deploy `backend/` to any Node host (Render, Railway, Fly.io, a VM, etc. — Vercel
   serverless functions are not a good fit for a stateful Socket.IO server). Set `MONGODB_URI` to
-  your Atlas connection string, real `JWT_*` secrets, `CORS_ORIGIN` to your Vercel domain, and
+  your Atlas connection string, real `JWT_*` secrets, `CORS_ORIGIN` to your Vercel domain
+  (for example `https://frontend-wy5s.vercel.app`; comma-separate multiple origins), and
   `CLOUDINARY_*` for logo uploads. Because the frontend and backend will be on different
   registrable domains in production, auth cookies are automatically switched to
   `SameSite=None; Secure` in production (see `backend/src/controllers/authController.ts`).
