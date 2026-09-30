@@ -1,5 +1,10 @@
 import "dotenv/config";
 
+const DEFAULT_CORS_ORIGINS = [
+  "http://localhost:3000",
+  "https://frontend-wy5s.vercel.app",
+];
+
 function required(name: string, fallback?: string): string {
   const value = process.env[name] ?? fallback;
   if (value === undefined) {
@@ -22,7 +27,8 @@ function normalizeOrigin(origin: string): string | null {
 function parseCorsOrigins(value: string): string[] {
   return Array.from(
     new Set(
-      value
+      [value, process.env.FRONTEND_URL ?? "", ...DEFAULT_CORS_ORIGINS]
+        .join(",")
         .split(",")
         .map(normalizeOrigin)
         .filter((origin): origin is string => Boolean(origin))
