@@ -5,6 +5,21 @@ function normalizeApiUrl(value: string | undefined): string {
 }
 
 const API_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
+const ACCESS_TOKEN_KEY = "parkflow:access-token";
+
+export function getAccessToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+export function setAccessToken(token: string | null): void {
+  if (typeof window === "undefined") return;
+  if (token) {
+    window.localStorage.setItem(ACCESS_TOKEN_KEY, token);
+  } else {
+    window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+  }
+}
 
 export class ApiError extends Error {
   code: string;
@@ -24,8 +39,19 @@ async function tryRefresh(): Promise<boolean> {
       method: "POST",
       credentials: "include",
     })
-      .then((res) => res.ok)
-      .catch(() => false)
+      .then(async (res) => {
+        if (!res.ok) {
+          setAccessToken(null);
+          return false;
+        }
+        const data = (await res.json()) as { accessToken?: string };
+        if (data.accessToken) setAccessToken(data.accessToken);
+        return true;
+      })
+      .catch(() => {
+        setAccessToken(null);
+        return false;
+      })
       .finally(() => {
         refreshPromise = null;
       });
@@ -40,12 +66,14 @@ export interface ApiFetchOptions extends RequestInit {
 export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptions = {}): Promise<T> {
   const { skipRefreshRetry, ...init } = options;
   const isFormData = init.body instanceof FormData;
+  const accessToken = getAccessToken();
 
   const res = await fetch(apiUrl(path), {
     ...init,
     credentials: "include",
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...init.headers,
     },
   });
@@ -65,6 +93,7 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
   const body = contentType.includes("application/json") ? await res.json() : await res.text();
 
   if (!res.ok) {
+    if (res.status === 401) setAccessToken(null);
     const message =
       typeof body === "object" && body && "error" in body
         ? (body as { error: { message: string; code: string } }).error.message

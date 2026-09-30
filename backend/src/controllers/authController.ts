@@ -74,10 +74,14 @@ export const updateProfileSchema = z
 // different registrable domains, so cookies must be SameSite=None+Secure to
 // survive the cross-site fetch; in local dev http://localhost keeps Lax so
 // it also works without HTTPS.
+const USE_CROSS_SITE_COOKIES =
+  isProduction ||
+  Boolean(process.env.RENDER || process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_ID);
+
 const ACCESS_COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: isProduction,
-  sameSite: (isProduction ? "none" : "lax") as "none" | "lax",
+  secure: USE_CROSS_SITE_COOKIES,
+  sameSite: (USE_CROSS_SITE_COOKIES ? "none" : "lax") as "none" | "lax",
   domain: env.cookieDomain === "localhost" ? undefined : env.cookieDomain,
   maxAge: 15 * 60 * 1000,
 };
