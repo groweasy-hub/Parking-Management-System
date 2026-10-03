@@ -216,7 +216,6 @@ export default function EntryGatePage() {
 
       setCheckingAvailability(true);
       try {
-        const allocationVehicleType = vType === "OTHER" ? "CAR" : vType;
         let companyId = comp?._id;
         if (!companyId && companies.length > 0) {
           companyId = companies[0]._id;
@@ -234,7 +233,7 @@ export default function EntryGatePage() {
         }
 
         const data = await apiFetch<{ allocations: AllocationAvailability[] }>(
-          `/api/parking/availability?projectId=${currentProjectId}&companyId=${companyId}&vehicleType=${allocationVehicleType}`
+          `/api/parking/availability?projectId=${currentProjectId}&companyId=${companyId}&vehicleType=${vType}`
         );
 
         let targetAlloc: AllocationAvailability | undefined;
