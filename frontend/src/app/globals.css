@@ -400,6 +400,25 @@ a {
     line-height: 1 !important;
   }
 
+  .entry-receipt-project {
+    background: #fff !important;
+    color: #000 !important;
+    border: 3px solid #000 !important;
+    page-break-inside: avoid;
+  }
+
+  .entry-receipt-project p:first-child {
+    color: #000 !important;
+    font-size: 14pt !important;
+  }
+
+  .entry-receipt-project p:nth-child(2) {
+    color: #000 !important;
+    font-size: 30pt !important;
+    line-height: 1.1 !important;
+    text-align: center !important;
+  }
+
   .entry-receipt-print button {
     display: none !important;
   }

@@ -57,6 +57,7 @@ interface EntryReceipt {
   vehicleNumber: string | null;
   entryTime: string;
   status: string;
+  entryGateName?: string;
   qrToken: string;
   qrImageUrl: string;
   qrPayload: {
@@ -68,7 +69,7 @@ interface EntryReceipt {
 
 export default function EntryGatePage() {
   const router = useRouter();
-  const { currentProjectId } = useProject();
+  const { currentProjectId, currentProject } = useProject();
 
   // Mobile Step Wizard State (1: Vehicle, 2: Destination, 3: Clearance)
   const [step, setStep] = useState<Step>(1);
@@ -1574,8 +1575,17 @@ export default function EntryGatePage() {
               </p>
             </div>
 
-            <div className="mt-4 grid gap-4 sm:grid-cols-[180px_1fr]">
-              <div className="rounded-2xl border-2 border-slate-900 bg-white p-3">
+            <div className="entry-receipt-project mt-4 rounded-2xl bg-slate-950 px-4 py-3 text-center text-white dark:bg-white dark:text-slate-950">
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] opacity-70">
+                Project
+              </p>
+              <p className="text-2xl font-black leading-tight tracking-tight">
+                {currentProject?.name ?? "Parking Project"}
+              </p>
+            </div>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-[140px_1fr]">
+              <div className="mx-auto w-36 rounded-2xl border-2 border-slate-900 bg-white p-2 sm:w-full">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={entryReceipt.qrImageUrl} alt="Parking QR code" className="h-auto w-full" />
               </div>
@@ -1603,6 +1613,12 @@ export default function EntryGatePage() {
                   </p>
                 </div>
                 <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Entry Gate</p>
+                  <p className="font-bold text-slate-950 dark:text-white">
+                    {entryReceipt.entryGateName || "Entry Gate"}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Entry Time</p>
                   <p className="font-semibold text-slate-700 dark:text-slate-200">
                     {new Date(entryReceipt.entryTime).toLocaleString()}
@@ -1627,7 +1643,7 @@ export default function EntryGatePage() {
               </button>
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => window.setTimeout(() => window.print(), 100)}
                 className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1565C0] text-sm font-black text-white hover:bg-blue-700"
               >
                 <Printer className="h-4 w-4" />
