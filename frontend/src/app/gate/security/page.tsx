@@ -13,7 +13,11 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { hashMpin, hasMpinForUser, markMpinUnlocked, mpinHashKey } from "@/lib/gate-security";
 
-type SecurityStep = "password" | "setup-mpin" | "verify-mpin" | "ready";
+type SecurityStep = "password" | "setup-mpin" | "verify-mpin" | "reset-mpin" | "ready";
+
+function normalizePhone(value: string | undefined): string {
+  return (value ?? "").replace(/\D/g, "");
+}
 
 export default function GateSecurityPage() {
   const { user, refreshUser } = useAuth();
@@ -24,6 +28,7 @@ export default function GateSecurityPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [mpin, setMpin] = useState("");
   const [confirmMpin, setConfirmMpin] = useState("");
+  const [registeredPhone, setRegisteredPhone] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,8 +50,17 @@ export default function GateSecurityPage() {
   const title = useMemo(() => {
     if (step === "password") return "Change Password";
     if (step === "setup-mpin") return "Set Device MPIN";
+    if (step === "reset-mpin") return "Reset MPIN";
     return "Enter MPIN";
   }, [step]);
+
+  function beginMpinReset() {
+    setError(null);
+    setMpin("");
+    setConfirmMpin("");
+    setRegisteredPhone("");
+    setStep("reset-mpin");
+  }
 
   async function handlePasswordSubmit(e: FormEvent) {
     e.preventDefault();
@@ -125,6 +139,46 @@ export default function GateSecurityPage() {
     }
   }
 
+  async function handleResetMpin(e: FormEvent) {
+    e.preventDefault();
+    if (!user) return;
+
+    const savedPhone = normalizePhone(user.phone);
+    const enteredPhone = normalizePhone(registeredPhone);
+    if (!savedPhone) {
+      setError("No mobile number is saved for this user. Please contact admin.");
+      return;
+    }
+    if (!enteredPhone || enteredPhone !== savedPhone) {
+      setError("Mobile number does not match this account.");
+      return;
+    }
+    if (!/^\d{4}$/.test(mpin)) {
+      setError("New MPIN must be exactly 4 digits.");
+      return;
+    }
+    if (mpin !== confirmMpin) {
+      setError("New MPIN and confirm MPIN must match.");
+      return;
+    }
+    if (!rememberDevice) {
+      setError("Please select Remember this device before saving MPIN.");
+      return;
+    }
+
+    setError(null);
+    setSubmitting(true);
+    try {
+      const hashed = await hashMpin(user.id, mpin);
+      window.localStorage.setItem(mpinHashKey(user.id), hashed);
+      markMpinUnlocked(user.id);
+      setStep("ready");
+      router.replace("/gate/select");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="mx-auto flex min-h-[calc(100vh-7rem)] w-full max-w-md items-center">
       <Card className="w-full rounded-2xl border-border/70 shadow-lg">
@@ -139,7 +193,9 @@ export default function GateSecurityPage() {
                 ? "Use the password given by super admin once, then create your own."
                 : step === "setup-mpin"
                   ? "This MPIN unlocks gate operations on this device."
-                  : "Enter your device MPIN to continue gate operations."}
+                  : step === "reset-mpin"
+                    ? "Verify your registered mobile number, then create a new MPIN."
+                    : "Enter your device MPIN to continue gate operations."}
             </CardDescription>
           </div>
         </CardHeader>
@@ -208,6 +264,54 @@ export default function GateSecurityPage() {
                 {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LockKeyhole className="mr-2 h-4 w-4" />}
                 Unlock Gate App
               </Button>
+              <button
+                type="button"
+                onClick={beginMpinReset}
+                className="w-full text-center text-xs font-bold text-primary hover:underline"
+              >
+                Forgot MPIN? Reset with registered mobile number
+              </button>
+            </form>
+          )}
+
+          {step === "reset-mpin" && (
+            <form onSubmit={handleResetMpin} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="registered-phone" className="text-xs font-bold">
+                  Registered Mobile Number
+                </Label>
+                <Input
+                  id="registered-phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  required
+                  className="h-12 rounded-xl border-2 bg-card text-sm font-medium"
+                  value={registeredPhone}
+                  onChange={(e) => setRegisteredPhone(e.target.value)}
+                  placeholder="Enter your account mobile number"
+                />
+              </div>
+              <MpinField id="reset-mpin" label="New MPIN" value={mpin} onChange={setMpin} />
+              <MpinField id="confirm-reset-mpin" label="Confirm New MPIN" value={confirmMpin} onChange={setConfirmMpin} />
+              <RememberDeviceCheckbox checked={rememberDevice} onChange={setRememberDevice} />
+              <Button type="submit" className="h-12 w-full rounded-xl font-bold" disabled={submitting}>
+                {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                Save New MPIN
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setMpin("");
+                  setConfirmMpin("");
+                  setRegisteredPhone("");
+                  setStep("verify-mpin");
+                }}
+                className="w-full text-center text-xs font-bold text-muted-foreground hover:text-foreground"
+              >
+                Back to MPIN unlock
+              </button>
             </form>
           )}
         </CardContent>
