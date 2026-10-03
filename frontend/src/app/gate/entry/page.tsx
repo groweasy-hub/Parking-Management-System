@@ -1728,7 +1728,7 @@ export default function EntryGatePage() {
 
       {entryReceipt && (
         <div className="entry-receipt-print-backdrop fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:items-center">
-          <div className="w-full max-w-[325px]">
+          <div className="max-h-[calc(100svh-24px)] w-full max-w-[325px] overflow-y-auto">
             <div className="entry-receipt-print overflow-hidden rounded-[6px] bg-white shadow-2xl">
               <div className="relative bg-gradient-to-r from-[#18A765] to-[#279D5F] px-4 py-3 text-white">
                 <div className="flex items-center gap-3">
@@ -1745,7 +1745,7 @@ export default function EntryGatePage() {
                 <button
                   type="button"
                   onClick={() => setEntryReceipt(null)}
-                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
+                  className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#168C55] shadow-sm hover:bg-emerald-50"
                   title="Close receipt"
                 >
                   <X className="h-4 w-4" />
@@ -1903,16 +1903,11 @@ export default function EntryGatePage() {
             <div className="entry-receipt-actions mt-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  navigator.clipboard?.writeText(entryReceipt.qrToken).then(
-                    () => toast.success("QR token copied."),
-                    () => toast.error("Unable to copy QR token.")
-                  );
-                }}
-                className="entry-receipt-action flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-700 hover:bg-slate-50"
+                onClick={() => setEntryReceipt(null)}
+                className="entry-receipt-action flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white text-sm font-black text-emerald-700 hover:bg-emerald-50"
               >
-                <Copy className="h-4 w-4" />
-                Copy
+                <Check className="h-4 w-4" />
+                Done
               </button>
               <button
                 type="button"
