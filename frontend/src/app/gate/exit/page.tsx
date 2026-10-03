@@ -420,29 +420,29 @@ export default function ExitGatePage() {
   }
 
   return (
-    <div className="gate-mobile-surface min-h-[calc(100svh-76px)] w-full space-y-4 px-4 py-5 sm:mx-auto sm:min-h-0 sm:max-w-7xl sm:bg-transparent sm:px-0 sm:py-0 sm:space-y-6">
+    <div className="gate-mobile-surface min-h-[calc(100svh-76px)] w-full space-y-4 px-5 py-5 text-slate-900 sm:mx-auto sm:min-h-0 sm:max-w-7xl sm:bg-transparent sm:px-0 sm:py-0 sm:space-y-6 dark:text-slate-100">
       {/* TOTAL VEHICLES IN PARKING AREA HERO CARD */}
-      <div className="gate-card-rise rounded-3xl border-2 border-rose-500/30 bg-gradient-to-br from-card via-card to-rose-500/5 p-4 shadow-sm space-y-2.5">
+      <div className="gate-card-rise rounded-3xl border-2 border-blue-100 bg-white p-4 shadow-sm space-y-2.5 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 font-black shadow-xs">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#EBF3FC] text-[#1565C0] font-black shadow-xs">
               <Car className="h-6 w-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <span className="text-xs font-extrabold uppercase tracking-widest text-[#1565C0]">
                   Total Vehicles in Parking Area
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600 border border-emerald-100">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   Live
                 </span>
               </div>
               <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                <span className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
                   {sessions.length}
                 </span>
-                <span className="text-xs font-semibold text-muted-foreground">
+                <span className="text-xs font-semibold text-slate-500">
                   vehicle{sessions.length === 1 ? "" : "s"} currently parked inside
                 </span>
               </div>
@@ -451,15 +451,15 @@ export default function ExitGatePage() {
 
           {/* Category Breakdown & Gate Selector & Manual Sync */}
           <div className="flex items-center gap-2 self-start sm:self-auto overflow-x-auto no-scrollbar">
-            <span className="inline-flex items-center gap-1 rounded-xl bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 text-xs font-bold text-blue-600 dark:text-blue-400">
+            <span className="inline-flex items-center gap-1 rounded-xl bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-bold text-[#1565C0]">
               <Car className="h-3.5 w-3.5" />
               <span>{vehicleCounts.CAR} Cars</span>
             </span>
-            <span className="inline-flex items-center gap-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+            <span className="inline-flex items-center gap-1 rounded-xl bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-bold text-[#1565C0]">
               <Bike className="h-3.5 w-3.5" />
               <span>{vehicleCounts.BIKE} Bikes</span>
             </span>
-            <span className="inline-flex items-center gap-1 rounded-xl bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 text-xs font-bold text-amber-600 dark:text-amber-400">
+            <span className="inline-flex items-center gap-1 rounded-xl bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-bold text-[#1565C0]">
               <Truck className="h-3.5 w-3.5" />
               <span>{vehicleCounts.OTHER} Other</span>
             </span>
@@ -484,15 +484,15 @@ export default function ExitGatePage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border-2 border-dashed border-primary/30 bg-card p-3.5 sm:p-4 shadow-sm space-y-3">
+      <div className="gate-card-rise rounded-3xl border-2 border-blue-100 bg-white p-3.5 shadow-sm space-y-3 sm:p-4 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#1565C0]">
               <QrCode className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-sm font-black tracking-tight">Optional QR Scan</h2>
-              <p className="text-xs text-muted-foreground">
+              <h2 className="text-sm font-black tracking-tight text-slate-900 dark:text-white">Optional QR Scan</h2>
+              <p className="text-xs text-slate-500">
                 Manual vehicle search below remains the main exit flow.
               </p>
             </div>
@@ -503,7 +503,7 @@ export default function ExitGatePage() {
               variant="outline"
               size="sm"
               onClick={qrScanning ? stopQrScanner : startQrScanner}
-              className="h-10 rounded-xl font-bold gap-2"
+              className="gate-press h-10 rounded-xl border-2 border-slate-200 bg-white font-bold gap-2 text-slate-700 hover:bg-slate-50"
             >
               <Camera className="h-4 w-4" />
               {qrScanning ? "Stop Scan" : "Scan QR"}
@@ -513,7 +513,7 @@ export default function ExitGatePage() {
               size="sm"
               onClick={() => fetchQrSession(qrToken)}
               disabled={qrLoading}
-              className="h-10 rounded-xl font-bold gap-2"
+              className="gate-press h-10 rounded-xl bg-[#1565C0] font-bold gap-2 text-white hover:bg-blue-700"
             >
               {qrLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
               Fetch Details
@@ -537,17 +537,17 @@ export default function ExitGatePage() {
           value={qrToken}
           onChange={(e) => setQrToken(e.target.value)}
           placeholder="Paste parking QR token here if camera scan is not available"
-          className="h-11 rounded-xl font-mono text-xs"
+          className="h-11 rounded-xl border-slate-200 bg-slate-50 font-mono text-xs focus-visible:border-[#1565C0] focus-visible:ring-[#1565C0]"
         />
 
         {qrSession && (
-          <div className="rounded-2xl border-2 border-emerald-500/30 bg-emerald-500/10 p-3.5">
+          <div className="rounded-2xl border-2 border-emerald-200 bg-[#E8F5E9] p-3.5">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
                   QR Details Found
                 </p>
-                <p className="font-mono text-lg font-black tracking-wide text-foreground">
+                <p className="font-mono text-lg font-black tracking-wide text-slate-900">
                   {qrSession.vehicleNumber || qrSession.sessionCode}
                 </p>
               </div>
@@ -557,21 +557,21 @@ export default function ExitGatePage() {
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-              <div className="rounded-xl bg-background/80 p-2.5">
-                <p className="font-bold uppercase tracking-wider text-muted-foreground">Company</p>
-                <p className="mt-1 font-black text-foreground">{fieldName(qrSession.companyId) || "-"}</p>
+              <div className="rounded-xl bg-white/85 p-2.5">
+                <p className="font-bold uppercase tracking-wider text-slate-500">Company</p>
+                <p className="mt-1 font-black text-slate-900">{fieldName(qrSession.companyId) || "-"}</p>
               </div>
-              <div className="rounded-xl bg-background/80 p-2.5">
-                <p className="font-bold uppercase tracking-wider text-muted-foreground">Floor</p>
-                <p className="mt-1 font-black text-foreground">{fieldName(qrSession.floorId) || "-"}</p>
+              <div className="rounded-xl bg-white/85 p-2.5">
+                <p className="font-bold uppercase tracking-wider text-slate-500">Floor</p>
+                <p className="mt-1 font-black text-slate-900">{fieldName(qrSession.floorId) || "-"}</p>
               </div>
-              <div className="rounded-xl bg-background/80 p-2.5">
-                <p className="font-bold uppercase tracking-wider text-muted-foreground">Vehicle</p>
-                <p className="mt-1 font-black text-foreground">{qrSession.vehicleType}</p>
+              <div className="rounded-xl bg-white/85 p-2.5">
+                <p className="font-bold uppercase tracking-wider text-slate-500">Vehicle</p>
+                <p className="mt-1 font-black text-slate-900">{qrSession.vehicleType}</p>
               </div>
-              <div className="rounded-xl bg-background/80 p-2.5">
-                <p className="font-bold uppercase tracking-wider text-muted-foreground">Entry</p>
-                <p className="mt-1 font-black text-foreground">
+              <div className="rounded-xl bg-white/85 p-2.5">
+                <p className="font-bold uppercase tracking-wider text-slate-500">Entry</p>
+                <p className="mt-1 font-black text-slate-900">
                   {new Date(qrSession.entryTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </p>
               </div>
@@ -580,7 +580,7 @@ export default function ExitGatePage() {
             <Button
               type="button"
               onClick={() => setConfirmSession(qrSession)}
-              className="mt-3 h-11 w-full rounded-xl bg-emerald-600 font-black text-white hover:bg-emerald-700"
+              className="gate-press mt-3 h-11 w-full rounded-xl bg-[#1565C0] font-black text-white hover:bg-blue-700"
             >
               Confirm Exit for This Vehicle
             </Button>
@@ -595,19 +595,19 @@ export default function ExitGatePage() {
           {/* ========================================================================= */}
           {/* OPTION A: SEARCH BY VEHICLE NUMBER (2-STEP ULTRA FAST EXIT)               */}
           {/* ========================================================================= */}
-          <div className="rounded-2xl border-2 border-border/80 bg-card p-3.5 sm:p-4 shadow-sm space-y-2.5">
+          <div className="gate-card-rise rounded-3xl border-2 border-blue-100 bg-white p-3.5 shadow-sm space-y-2.5 sm:p-4 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between">
-          <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-            <Search className="h-3.5 w-3.5 text-primary" />
+          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <Search className="h-3.5 w-3.5 text-[#1565C0]" />
             Enter Vehicle Number
           </Label>
-          <span className="text-[11px] text-primary font-bold">Fast 2-Step Exit</span>
+          <span className="text-[11px] text-[#1565C0] font-bold">Fast 2-Step Exit</span>
         </div>
 
         <div className="relative">
           <Input
             placeholder="Type vehicle plate (TG 09 GH 1234) or session code..."
-            className="h-13 pl-11 pr-10 text-base uppercase font-mono tracking-wider font-extrabold rounded-xl border-2 focus-visible:border-primary"
+            className="h-13 pl-11 pr-10 text-base uppercase font-mono tracking-wider font-extrabold rounded-xl border-2 border-slate-200 bg-slate-50 focus-visible:border-[#1565C0] focus-visible:ring-[#1565C0]"
             value={plateQuery}
             onChange={(e) => {
               setPlateQuery(e.target.value.toUpperCase());
@@ -633,7 +633,7 @@ export default function ExitGatePage() {
                 <button
                   key={match._id}
                   onClick={() => setConfirmSession(match)}
-                  className="w-full flex items-center justify-between p-3.5 rounded-xl border border-primary/40 bg-primary/5 hover:bg-primary/10 text-left transition tap-bounce shadow-xs"
+                  className="gate-press w-full flex items-center justify-between p-3.5 rounded-xl border-2 border-[#1565C0] bg-[#EFF6FF] text-left transition shadow-xs"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     {match.vehicleNumber ? (
@@ -676,7 +676,7 @@ export default function ExitGatePage() {
       {/* ========================================================================= */}
       <div className="space-y-3">
         <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-          {VEHICLE_TYPES_CONFIG.map(({ type, label, icon: Icon, gradient, activeBorder, badgeBg }) => {
+          {VEHICLE_TYPES_CONFIG.map(({ type, label, icon: Icon }) => {
             const count = vehicleCounts[type];
             const isSelected = selectedVehicleType === type;
 
@@ -685,24 +685,23 @@ export default function ExitGatePage() {
                 key={type}
                 onClick={() => handleSelectVehicleType(type)}
                 className={cn(
-                  "relative flex flex-col items-center justify-center p-3.5 sm:p-5 rounded-2xl border-2 text-center transition-all tap-bounce shadow-xs",
-                  isSelected
-                    ? activeBorder
-                    : "border-border/80 bg-card hover:border-primary/50",
-                  !isSelected && gradient
-                )}
-              >
-                <div className="flex h-11 w-11 sm:h-13 sm:w-13 items-center justify-center rounded-xl bg-background/90 shadow-xs border mb-1.5">
+                    "gate-press relative flex flex-col items-center justify-center p-3.5 sm:p-5 rounded-2xl border text-center transition-all shadow-xs",
+                    isSelected
+                      ? "border-2 border-[#1565C0] bg-[#EFF6FF] shadow-sm"
+                      : "border-slate-200 bg-white hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700"
+                  )}
+                >
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#EBF3FC] text-[#1565C0] shadow-xs mb-1.5">
                   <Icon className="h-6 w-6 sm:h-7 sm:w-7" />
                 </div>
 
-                <p className="text-sm sm:text-base font-black tracking-tight">{label}</p>
+                <p className="text-sm sm:text-base font-bold tracking-tight text-slate-900 dark:text-white">{label}</p>
 
                 {/* Count Badge */}
                 <span
                   className={cn(
                     "mt-1 rounded-full px-2 py-0.5 text-[11px] font-black tracking-tight",
-                    count > 0 ? badgeBg : "bg-muted text-muted-foreground"
+                    count > 0 ? "bg-blue-50 text-[#1565C0]" : "bg-slate-100 text-slate-500"
                   )}
                 >
                   {count} Inside
@@ -719,12 +718,12 @@ export default function ExitGatePage() {
       {selectedVehicleType && (
         <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
           {/* Subheader with Active Type & Reset */}
-          <div className="flex items-center justify-between gap-2 p-3 bg-card rounded-2xl border border-border/80 shadow-xs">
+          <div className="flex items-center justify-between gap-2 rounded-2xl border border-blue-100 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center gap-2">
-              <Badge variant="default" className="text-xs font-black uppercase px-2.5 py-1">
+              <Badge className="bg-[#1565C0] px-2.5 py-1 text-xs font-black uppercase text-white hover:bg-[#1565C0]">
                 {selectedVehicleType}
               </Badge>
-              <span className="text-xs sm:text-sm font-bold text-foreground">
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
                 Select Company or Floor to Exit
               </span>
             </div>
@@ -733,7 +732,7 @@ export default function ExitGatePage() {
               variant="ghost"
               size="sm"
               onClick={resetSelection}
-              className="text-xs text-muted-foreground hover:text-foreground h-8"
+              className="h-8 text-xs font-bold text-slate-500 hover:text-slate-900"
             >
               Clear
             </Button>
@@ -741,7 +740,7 @@ export default function ExitGatePage() {
 
           {/* If a company is clicked with MULTIPLE vehicles -> show that company's vehicles */}
           {activeCompanyFilter ? (
-            <div className="space-y-3 bg-card rounded-2xl border border-border/80 p-4 shadow-sm animate-in fade-in">
+            <div className="space-y-3 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm animate-in fade-in dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between pb-2 border-b">
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base">
@@ -768,7 +767,7 @@ export default function ExitGatePage() {
                     <button
                       key={session._id}
                       onClick={() => setConfirmSession(session)}
-                      className="w-full flex items-center justify-between p-3.5 rounded-xl border border-border/80 bg-background hover:border-primary hover:bg-primary/5 text-left transition tap-bounce shadow-xs"
+                      className="gate-press w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-200 bg-white hover:border-[#1565C0] hover:bg-[#EFF6FF] text-left transition shadow-xs dark:bg-slate-800 dark:border-slate-700"
                     >
                       <div className="flex items-center gap-3">
                         {session.vehicleNumber ? (
@@ -790,7 +789,7 @@ export default function ExitGatePage() {
                           </p>
                         </div>
                       </div>
-                      <span className="text-xs font-black text-primary flex items-center gap-1">
+                      <span className="text-xs font-black text-[#1565C0] flex items-center gap-1">
                         Exit →
                       </span>
                     </button>
@@ -799,7 +798,7 @@ export default function ExitGatePage() {
             </div>
           ) : activeFloorFilter ? (
             /* If a floor is clicked with MULTIPLE vehicles -> show that floor's vehicles */
-            <div className="space-y-3 bg-card rounded-2xl border border-border/80 p-4 shadow-sm animate-in fade-in">
+            <div className="space-y-3 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm animate-in fade-in dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between pb-2 border-b">
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base">
@@ -826,7 +825,7 @@ export default function ExitGatePage() {
                     <button
                       key={session._id}
                       onClick={() => setConfirmSession(session)}
-                      className="w-full flex items-center justify-between p-3.5 rounded-xl border border-border/80 bg-background hover:border-primary hover:bg-primary/5 text-left transition tap-bounce shadow-xs"
+                      className="gate-press w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-200 bg-white hover:border-[#1565C0] hover:bg-[#EFF6FF] text-left transition shadow-xs dark:bg-slate-800 dark:border-slate-700"
                     >
                       <div className="flex items-center gap-3">
                         {session.vehicleNumber ? (
@@ -848,7 +847,7 @@ export default function ExitGatePage() {
                           </p>
                         </div>
                       </div>
-                      <span className="text-xs font-black text-primary flex items-center gap-1">
+                      <span className="text-xs font-black text-[#1565C0] flex items-center gap-1">
                         Exit →
                       </span>
                     </button>
@@ -859,15 +858,15 @@ export default function ExitGatePage() {
             /* Main List: Company List AND Floor List */
             <div className="space-y-3">
               {/* Segmented Switcher for Mobile & Desktop */}
-              <div className="flex rounded-xl bg-muted p-1 gap-1">
+              <div className="flex rounded-xl bg-slate-100 p-1 gap-1 dark:bg-slate-800">
                 <button
                   type="button"
                   onClick={() => setViewTab("companies")}
                   className={cn(
                     "flex-1 py-2 rounded-lg text-xs font-extrabold flex items-center justify-center gap-2 transition-all tap-bounce",
                     viewTab === "companies"
-                      ? "bg-card text-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "bg-white text-[#1565C0] shadow-xs dark:bg-slate-900"
+                      : "text-slate-500 hover:text-slate-900"
                   )}
                 >
                   <Building2 className="h-4 w-4" />
@@ -879,8 +878,8 @@ export default function ExitGatePage() {
                   className={cn(
                     "flex-1 py-2 rounded-lg text-xs font-extrabold flex items-center justify-center gap-2 transition-all tap-bounce",
                     viewTab === "floors"
-                      ? "bg-card text-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "bg-white text-[#1565C0] shadow-xs dark:bg-slate-900"
+                      : "text-slate-500 hover:text-slate-900"
                   )}
                 >
                   <Layers className="h-4 w-4" />
@@ -902,7 +901,7 @@ export default function ExitGatePage() {
                         key={company.id}
                         type="button"
                         onClick={() => handleSelectCompany(company)}
-                        className="w-full flex items-center justify-between p-3.5 sm:p-4 rounded-xl border border-border/80 bg-card hover:border-primary hover:bg-primary/5 text-left transition tap-bounce shadow-xs"
+                        className="gate-press w-full flex items-center justify-between p-3.5 sm:p-4 rounded-xl border border-slate-200 bg-white hover:border-[#1565C0] hover:bg-[#EFF6FF] text-left transition shadow-xs dark:bg-slate-800 dark:border-slate-700"
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           {company.logoUrl ? (
@@ -913,7 +912,7 @@ export default function ExitGatePage() {
                               className="h-10 w-10 rounded-xl object-cover border shrink-0"
                             />
                           ) : (
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary font-black text-sm">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#1565C0] font-black text-sm">
                               {company.name.slice(0, 2).toUpperCase()}
                             </div>
                           )}
@@ -941,7 +940,7 @@ export default function ExitGatePage() {
                           >
                             {company.vehicles.length} {selectedVehicleType}
                           </Badge>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          <ChevronRight className="h-4 w-4 text-[#1565C0]" />
                         </div>
                       </button>
                     ))
@@ -962,10 +961,10 @@ export default function ExitGatePage() {
                         key={floor.id}
                         type="button"
                         onClick={() => handleSelectFloor(floor)}
-                        className="w-full flex items-center justify-between p-3.5 sm:p-4 rounded-xl border border-border/80 bg-card hover:border-primary hover:bg-primary/5 text-left transition tap-bounce shadow-xs"
+                        className="gate-press w-full flex items-center justify-between p-3.5 sm:p-4 rounded-xl border border-slate-200 bg-white hover:border-[#1565C0] hover:bg-[#EFF6FF] text-left transition shadow-xs dark:bg-slate-800 dark:border-slate-700"
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 font-black text-sm border border-indigo-500/20">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#1565C0] font-black text-sm border border-blue-100">
                             {floor.code || floor.name.slice(0, 2)}
                           </div>
 
@@ -992,7 +991,7 @@ export default function ExitGatePage() {
                           >
                             {floor.vehicles.length} {selectedVehicleType}
                           </Badge>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          <ChevronRight className="h-4 w-4 text-[#1565C0]" />
                         </div>
                       </button>
                     ))
@@ -1007,7 +1006,7 @@ export default function ExitGatePage() {
 
         {/* Right Column (Desktop Only): Live Parked Vehicles Queue & Quick 1-Click Exit */}
         <div className="hidden lg:flex lg:flex-col lg:col-span-5 xl:col-span-5 space-y-4 sticky top-20">
-          <div className="rounded-2xl border-2 border-border/80 bg-card p-4 shadow-sm space-y-3">
+          <div className="rounded-3xl border-2 border-blue-100 bg-white p-4 shadow-sm space-y-3 dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -1033,7 +1032,7 @@ export default function ExitGatePage() {
                     key={item._id}
                     type="button"
                     onClick={() => setConfirmSession(item)}
-                    className="w-full flex items-center justify-between p-3 rounded-xl border border-border/80 bg-muted/20 hover:bg-rose-500/10 hover:border-rose-500/30 text-left transition tap-bounce group"
+                    className="gate-press w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-white hover:bg-[#EFF6FF] hover:border-[#1565C0] text-left transition group dark:bg-slate-800 dark:border-slate-700"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary font-black shrink-0">
@@ -1064,7 +1063,7 @@ export default function ExitGatePage() {
                     </div>
 
                     <div className="text-right shrink-0 pl-2">
-                      <span className="text-[11px] font-bold text-rose-600 group-hover:text-rose-700 flex items-center gap-0.5">
+                      <span className="text-[11px] font-bold text-[#1565C0] flex items-center gap-0.5">
                         Exit →
                       </span>
                       <span className="text-[10px] text-muted-foreground block">
@@ -1086,7 +1085,7 @@ export default function ExitGatePage() {
         <DialogContent className="sm:max-w-md rounded-3xl p-5 sm:p-6 border-2">
           <DialogHeader className="text-left">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] font-black uppercase tracking-wider text-rose-600 bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-500/20">
+              <span className="text-[11px] font-black uppercase tracking-wider text-[#1565C0] bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
                 Exit Authorization
               </span>
               <span className="font-mono text-xs text-muted-foreground font-bold">
@@ -1104,7 +1103,7 @@ export default function ExitGatePage() {
           {confirmSession && (
             <div className="space-y-4 my-2">
               {/* Plate Banner */}
-              <div className="text-center py-3 bg-muted/40 rounded-2xl border border-dashed border-border/80">
+              <div className="text-center py-3 bg-[#EFF6FF] rounded-2xl border border-dashed border-blue-100">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">
                   Vehicle License Plate
                 </p>
@@ -1120,7 +1119,7 @@ export default function ExitGatePage() {
               </div>
 
               {/* Detail Items */}
-              <div className="space-y-2.5 rounded-2xl bg-muted/30 p-3.5 border text-xs">
+              <div className="space-y-2.5 rounded-2xl bg-slate-50 p-3.5 border border-slate-200 text-xs">
                 <div className="flex justify-between items-center py-1 border-b border-border/40">
                   <span className="text-muted-foreground font-semibold flex items-center gap-1.5">
                     <Building2 className="h-3.5 w-3.5" /> Company
@@ -1174,7 +1173,7 @@ export default function ExitGatePage() {
               size="lg"
               disabled={submitting || !selectedGateId}
               onClick={handleConfirmExit}
-              className="w-full h-14 text-base font-black tracking-wide rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/25 tap-bounce flex items-center justify-center gap-2"
+              className="gate-press w-full h-14 text-base font-black tracking-wide rounded-2xl bg-[#1565C0] hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2"
             >
               {submitting ? (
                 <>
