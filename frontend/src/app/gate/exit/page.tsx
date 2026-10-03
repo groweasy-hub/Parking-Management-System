@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useProject } from "@/lib/project-context";
@@ -8,9 +8,13 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { deferNavigation } from "@/lib/deferred-navigation";
 import { Gate, ParkingSessionRecord, VehicleType } from "@/lib/types";
 import { useProjectRealtime } from "@/hooks/useRealtime";
+import {
+  TwoWheelerIllustration,
+  FourWheelerIllustration,
+  OthersIllustration,
+} from "@/components/gate/GateVisuals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,8 +28,6 @@ import {
 import { cn } from "@/lib/utils";
 import {
   Car,
-  Bike,
-  Truck,
   Search,
   Loader2,
   ArrowLeft,
@@ -45,7 +47,7 @@ interface VehicleTypeConfig {
   type: VehicleType;
   label: string;
   sub: string;
-  icon: typeof Car;
+  icon: ComponentType<{ className?: string }>;
   gradient: string;
   activeBorder: string;
   badgeBg: string;
@@ -53,28 +55,28 @@ interface VehicleTypeConfig {
 
 const VEHICLE_TYPES_CONFIG: VehicleTypeConfig[] = [
   {
-    type: "CAR",
-    label: "CAR",
-    sub: "Sedan, SUV, Hatchback",
-    icon: Car,
-    gradient: "from-blue-600/10 via-indigo-600/5 to-transparent border-blue-500/30 text-blue-600 dark:text-blue-400",
-    activeBorder: "border-blue-600 ring-2 ring-blue-500/20 bg-blue-500/10",
-    badgeBg: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  },
-  {
     type: "BIKE",
     label: "BIKE / 2W",
     sub: "Motorcycle, Scooter",
-    icon: Bike,
+    icon: TwoWheelerIllustration,
     gradient: "from-emerald-600/10 via-teal-600/5 to-transparent border-emerald-500/30 text-emerald-600 dark:text-emerald-400",
     activeBorder: "border-emerald-600 ring-2 ring-emerald-500/20 bg-emerald-500/10",
     badgeBg: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   },
   {
+    type: "CAR",
+    label: "CAR",
+    sub: "Sedan, SUV, Hatchback",
+    icon: FourWheelerIllustration,
+    gradient: "from-blue-600/10 via-indigo-600/5 to-transparent border-blue-500/30 text-blue-600 dark:text-blue-400",
+    activeBorder: "border-blue-600 ring-2 ring-blue-500/20 bg-blue-500/10",
+    badgeBg: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+  },
+  {
     type: "OTHER",
     label: "OTHER",
     sub: "Van, Delivery, Truck",
-    icon: Truck,
+    icon: OthersIllustration,
     gradient: "from-amber-600/10 via-orange-600/5 to-transparent border-amber-500/30 text-amber-600 dark:text-amber-400",
     activeBorder: "border-amber-600 ring-2 ring-amber-500/20 bg-amber-500/10",
     badgeBg: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
@@ -98,6 +100,12 @@ function formatDuration(entryTime: string): string {
   const mins = totalMins % 60;
   if (hours === 0) return `${mins} min${mins === 1 ? "" : "s"}`;
   return `${hours} hr${hours === 1 ? "" : "s"} ${mins} min${mins === 1 ? "" : "s"}`;
+}
+
+function VehicleTypeIllustration({ type, className }: { type: VehicleType; className?: string }) {
+  if (type === "BIKE") return <TwoWheelerIllustration className={className} />;
+  if (type === "CAR") return <FourWheelerIllustration className={className} />;
+  return <OthersIllustration className={className} />;
 }
 
 export default function ExitGatePage() {
@@ -452,15 +460,15 @@ export default function ExitGatePage() {
           {/* Category Breakdown & Gate Selector & Manual Sync */}
           <div className="flex items-center gap-2 self-start sm:self-auto overflow-x-auto no-scrollbar">
             <span className="inline-flex items-center gap-1 rounded-xl bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-bold text-[#1565C0]">
-              <Car className="h-3.5 w-3.5" />
-              <span>{vehicleCounts.CAR} Cars</span>
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-xl bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-bold text-[#1565C0]">
-              <Bike className="h-3.5 w-3.5" />
+              <TwoWheelerIllustration className="h-4 w-5" />
               <span>{vehicleCounts.BIKE} Bikes</span>
             </span>
             <span className="inline-flex items-center gap-1 rounded-xl bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-bold text-[#1565C0]">
-              <Truck className="h-3.5 w-3.5" />
+              <FourWheelerIllustration className="h-4 w-5" />
+              <span>{vehicleCounts.CAR} Cars</span>
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-xl bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-bold text-[#1565C0]">
+              <OthersIllustration className="h-4 w-5" />
               <span>{vehicleCounts.OTHER} Other</span>
             </span>
 
@@ -672,7 +680,7 @@ export default function ExitGatePage() {
       </div>
 
       {/* ========================================================================= */}
-      {/* OPTION B: VEHICLE TYPE SELECTOR (CAR, BIKE, OTHER)                        */}
+      {/* OPTION B: VEHICLE TYPE SELECTOR (BIKE, CAR, OTHER)                        */}
       {/* ========================================================================= */}
       <div className="space-y-3">
         <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
@@ -1035,14 +1043,8 @@ export default function ExitGatePage() {
                     className="gate-press w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-white hover:bg-[#EFF6FF] hover:border-[#1565C0] text-left transition group dark:bg-slate-800 dark:border-slate-700"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary font-black shrink-0">
-                        {item.vehicleType === "CAR" ? (
-                          <Car className="h-4 w-4" />
-                        ) : item.vehicleType === "BIKE" ? (
-                          <Bike className="h-4 w-4" />
-                        ) : (
-                          <Truck className="h-4 w-4" />
-                        )}
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-[#1565C0] font-black shrink-0">
+                        <VehicleTypeIllustration type={item.vehicleType} className="h-5 w-6" />
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
