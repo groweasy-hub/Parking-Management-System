@@ -437,52 +437,38 @@ export default function ExitGatePage() {
   }
 
   return (
-    <div className="gate-mobile-surface min-h-[calc(100svh-76px)] w-full space-y-4 px-5 py-5 text-slate-900 sm:mx-auto sm:min-h-0 sm:max-w-7xl sm:bg-transparent sm:px-0 sm:py-0 sm:space-y-6 dark:text-slate-100">
+    <div className="gate-mobile-surface min-h-[calc(100svh-76px)] w-full space-y-3 px-4 py-4 text-slate-900 sm:mx-auto sm:min-h-0 sm:max-w-7xl sm:bg-transparent sm:px-0 sm:py-0 sm:space-y-5 dark:text-slate-100">
       {/* TOTAL VEHICLES IN PARKING AREA HERO CARD */}
-      <div className="gate-card-rise rounded-3xl border-2 border-blue-100 bg-white p-4 shadow-sm space-y-2.5 dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#EBF3FC] text-[#1565C0] font-black shadow-xs">
-              <Car className="h-6 w-6" />
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EBF3FC] text-[#1565C0] font-black">
+              <Car className="h-5 w-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-extrabold uppercase tracking-widest text-[#1565C0]">
-                  Total Vehicles in Parking Area
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1565C0]">
+                  Vehicles Parked
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600 border border-emerald-100">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                   Live
                 </span>
               </div>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-black leading-none tracking-tight text-slate-900 dark:text-white">
                   {sessions.length}
                 </span>
-                <span className="text-xs font-semibold text-slate-500">
-                  vehicle{sessions.length === 1 ? "" : "s"} currently parked inside
+                <span className="text-[11px] font-semibold text-slate-500">
+                  vehicle{sessions.length === 1 ? "" : "s"} inside
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Category Breakdown & Gate Selector & Manual Sync */}
-          <div className="flex items-center gap-2 self-start sm:self-auto overflow-x-auto no-scrollbar">
-            <span className="inline-flex items-center gap-1 rounded-xl bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-bold text-[#1565C0]">
-              <TwoWheelerIllustration className="h-4 w-5" />
-              <span>{vehicleCounts.BIKE} Bikes</span>
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-xl bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-bold text-[#1565C0]">
-              <FourWheelerIllustration className="h-4 w-5" />
-              <span>{vehicleCounts.CAR} Cars</span>
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-xl bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-bold text-[#1565C0]">
-              <OthersIllustration className="h-4 w-5" />
-              <span>{vehicleCounts.OTHER} Other</span>
-            </span>
-
+          <div className="flex items-center gap-1.5">
             {exitGates.length > 0 ? (
-              <Badge variant="outline" className="font-semibold text-xs h-7 px-2 rounded-lg">
+              <Badge variant="outline" className="h-7 rounded-lg px-2 text-[11px] font-bold">
                 {exitGates.find((g) => g._id === selectedGateId)?.name ?? "Exit Gate"}
               </Badge>
             ) : null}
@@ -490,7 +476,7 @@ export default function ExitGatePage() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground shrink-0"
+              className="h-8 w-8 shrink-0 rounded-xl text-slate-500 hover:text-slate-900"
               onClick={loadSessions}
               disabled={loading}
               title="Refresh live count"
@@ -499,33 +485,50 @@ export default function ExitGatePage() {
             </Button>
           </div>
         </div>
+
+          {/* Category Breakdown & Gate Selector & Manual Sync */}
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <span className="inline-flex min-w-0 items-center justify-center gap-1 rounded-2xl bg-blue-50 px-2 py-2 text-[11px] font-black text-[#1565C0]">
+              <TwoWheelerIllustration className="h-4 w-5" />
+              <span>{vehicleCounts.BIKE}</span>
+              <span className="font-bold">Bikes</span>
+            </span>
+            <span className="inline-flex min-w-0 items-center justify-center gap-1 rounded-2xl bg-blue-50 px-2 py-2 text-[11px] font-black text-[#1565C0]">
+              <FourWheelerIllustration className="h-4 w-5" />
+              <span>{vehicleCounts.CAR}</span>
+              <span className="font-bold">Cars</span>
+            </span>
+            <span className="inline-flex min-w-0 items-center justify-center gap-1 rounded-2xl bg-blue-50 px-2 py-2 text-[11px] font-black text-[#1565C0]">
+              <OthersIllustration className="h-4 w-5" />
+              <span>{vehicleCounts.OTHER}</span>
+              <span className="font-bold">Other</span>
+            </span>
+          </div>
       </div>
 
-      <div className="gate-card-rise rounded-3xl border-2 border-blue-100 bg-white p-3.5 shadow-sm space-y-3 sm:p-4 dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm space-y-3 dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#1565C0]">
-              <QrCode className="h-5 w-5" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-[#1565C0]">
+              <QrCode className="h-4.5 w-4.5" />
             </div>
             <div>
-              <h2 className="text-sm font-black tracking-tight text-slate-900 dark:text-white">Optional QR Scan</h2>
-              <p className="text-xs text-slate-500">
-                Manual vehicle search below remains the main exit flow.
+              <h2 className="text-sm font-black tracking-tight text-slate-900 dark:text-white">Scan QR</h2>
+              <p className="text-[11px] leading-tight text-slate-500">
+                Auto fetches details after scan.
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
             <Button
               type="button"
               size="sm"
               onClick={qrScanning ? stopQrScanner : startQrScanner}
               disabled={qrLoading}
-              className="gate-press h-10 rounded-xl bg-[#1565C0] font-bold gap-2 text-white hover:bg-blue-700"
+              className="gate-press h-10 shrink-0 rounded-xl bg-[#1565C0] px-3 font-bold gap-2 text-white hover:bg-blue-700"
             >
               {qrLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
               {qrScanning ? "Stop Scan" : "Scan QR"}
             </Button>
-          </div>
         </div>
 
         {qrScanning && (
@@ -589,26 +592,26 @@ export default function ExitGatePage() {
           {/* ========================================================================= */}
           {/* OPTION A: SEARCH BY VEHICLE NUMBER (2-STEP ULTRA FAST EXIT)               */}
           {/* ========================================================================= */}
-          <div className="gate-card-rise rounded-3xl border-2 border-blue-100 bg-white p-3.5 shadow-sm space-y-2.5 sm:p-4 dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm space-y-3 dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-center justify-between gap-3">
+          <Label className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
             <Search className="h-3.5 w-3.5 text-[#1565C0]" />
             Enter Vehicle Number
           </Label>
-          <span className="text-[11px] text-[#1565C0] font-bold">Fast 2-Step Exit</span>
+          <span className="text-[11px] text-[#1565C0] font-bold">Fast Exit</span>
         </div>
 
         <div className="relative">
           <Input
             placeholder="Type vehicle plate (TG 09 GH 1234) or session code..."
-            className="h-13 pl-11 pr-10 text-sm uppercase font-mono tracking-wider font-extrabold rounded-xl border-2 border-slate-200 bg-slate-50 focus-visible:border-[#1565C0] focus-visible:ring-[#1565C0]"
+            className="h-12 rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-10 font-mono text-xs font-extrabold uppercase tracking-[0.16em] focus-visible:border-[#1565C0] focus-visible:ring-[#1565C0]"
             value={plateQuery}
             onChange={(e) => {
               setPlateQuery(e.target.value.toUpperCase());
               if (selectedVehicleType) setSelectedVehicleType(null);
             }}
           />
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Search className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
           {plateQuery && (
             <button
               onClick={() => setPlateQuery("")}
@@ -660,8 +663,8 @@ export default function ExitGatePage() {
       {/* Visual Separator */}
       <div className="relative flex items-center justify-center my-2">
         <div className="w-full border-t border-border/80" />
-        <span className="absolute bg-background px-3 text-[11px] font-black text-muted-foreground uppercase tracking-wider">
-          Or Exit by Vehicle Type (2-3 Steps)
+        <span className="absolute bg-background px-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+          Or Exit by Vehicle Type
         </span>
       </div>
 
@@ -669,7 +672,7 @@ export default function ExitGatePage() {
       {/* OPTION B: VEHICLE TYPE SELECTOR (BIKE, CAR, OTHER)                        */}
       {/* ========================================================================= */}
       <div className="space-y-3">
-        <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+        <div className="grid grid-cols-3 gap-2">
           {VEHICLE_TYPES_CONFIG.map(({ type, label, icon: Icon }) => {
             const count = vehicleCounts[type];
             const isSelected = selectedVehicleType === type;
@@ -679,22 +682,22 @@ export default function ExitGatePage() {
                 key={type}
                 onClick={() => handleSelectVehicleType(type)}
                 className={cn(
-                    "gate-press relative flex flex-col items-center justify-center p-3.5 sm:p-5 rounded-2xl border text-center transition-all shadow-xs",
+                    "gate-press relative flex min-h-[98px] flex-col items-center justify-center rounded-2xl border p-2.5 text-center transition-all shadow-xs",
                     isSelected
                       ? "border-2 border-[#1565C0] bg-[#EFF6FF] shadow-sm"
                       : "border-slate-200 bg-white hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700"
                   )}
                 >
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#EBF3FC] text-[#1565C0] shadow-xs mb-1.5">
-                  <Icon className="h-6 w-6 sm:h-7 sm:w-7" />
+                <div className="mb-1.5 flex h-11 w-11 items-center justify-center rounded-full bg-[#EBF3FC] text-[#1565C0]">
+                  <Icon className="h-5 w-6" />
                 </div>
 
-                <p className="text-xs sm:text-sm font-bold tracking-tight text-slate-900 dark:text-white">{label}</p>
+                <p className="text-[11px] font-black tracking-tight text-slate-900 dark:text-white">{label}</p>
 
                 {/* Count Badge */}
                 <span
                   className={cn(
-                    "mt-1 rounded-full px-2 py-0.5 text-[11px] font-black tracking-tight",
+                    "mt-1 rounded-full px-2 py-0.5 text-[10px] font-black tracking-tight",
                     count > 0 ? "bg-blue-50 text-[#1565C0]" : "bg-slate-100 text-slate-500"
                   )}
                 >
