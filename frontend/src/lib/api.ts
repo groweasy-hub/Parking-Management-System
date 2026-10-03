@@ -59,6 +59,10 @@ async function tryRefresh(): Promise<boolean> {
   return refreshPromise;
 }
 
+export function refreshAccessToken(): Promise<boolean> {
+  return tryRefresh();
+}
+
 export interface ApiFetchOptions extends RequestInit {
   skipRefreshRetry?: boolean;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
-import { apiFetch, ApiError, setAccessToken } from "./api";
+import { apiFetch, ApiError, refreshAccessToken, setAccessToken } from "./api";
 import { disconnectSocket } from "./socket";
 import { AuthUser } from "./types";
 
@@ -15,16 +15,33 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+function clearClientSession() {
+  setAccessToken(null);
+  disconnectSocket();
+  if (typeof window !== "undefined") {
+    Object.keys(window.sessionStorage)
+      .filter((key) => key.startsWith("parkflow:mpin-unlocked:"))
+      .forEach((key) => window.sessionStorage.removeItem(key));
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
     try {
+      const refreshed = await refreshAccessToken();
+      if (!refreshed) {
+        clearClientSession();
+        setUser(null);
+        return;
+      }
       const data = await apiFetch<{ user: AuthUser }>("/api/auth/me");
       setUser(data.user);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
+        clearClientSession();
         setUser(null);
       } else {
         setUser(null);
@@ -51,13 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
-    setAccessToken(null);
-    disconnectSocket();
-    if (typeof window !== "undefined") {
-      Object.keys(window.sessionStorage)
-        .filter((key) => key.startsWith("parkflow:mpin-unlocked:"))
-        .forEach((key) => window.sessionStorage.removeItem(key));
-    }
+    clearClientSession();
     setUser(null);
   }, []);
 
