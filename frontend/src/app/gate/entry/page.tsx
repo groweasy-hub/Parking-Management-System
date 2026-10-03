@@ -376,11 +376,11 @@ export default function EntryGatePage() {
   <meta charset="utf-8" />
   <title>${escapeHtml(projectName)} - Entry Receipt</title>
   <style>
-    @page { size: 80mm 240mm; margin: 0; }
+    @page { size: 80mm 260mm; margin: 0; }
     * { box-sizing: border-box; }
     html, body {
       width: 80mm;
-      height: 240mm;
+      height: 260mm;
       margin: 0;
       padding: 0;
       overflow: hidden;
@@ -390,7 +390,7 @@ export default function EntryGatePage() {
     }
     .receipt {
       width: 80mm;
-      height: 240mm;
+      height: 260mm;
       padding: 4mm;
       overflow: hidden;
       font-size: 10pt;
@@ -416,8 +416,10 @@ export default function EntryGatePage() {
       margin: 4mm 0 2mm;
     }
     .qr img {
-      width: 42mm;
-      height: 42mm;
+      display: block;
+      width: 50mm;
+      height: 50mm;
+      object-fit: contain;
     }
     .session {
       text-align: center;
