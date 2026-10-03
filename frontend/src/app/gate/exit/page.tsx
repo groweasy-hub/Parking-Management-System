@@ -249,7 +249,8 @@ export default function ExitGatePage() {
       }
     ).BarcodeDetector;
 
-    if (!BarcodeDetectorCtor || !navigator.mediaDevices?.getUserMedia) {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast.error("Camera access is not available in this browser.");
       return;
     }
 
@@ -272,6 +273,11 @@ export default function ExitGatePage() {
       }
       video.srcObject = stream;
       await video.play();
+
+      if (!BarcodeDetectorCtor) {
+        toast.error("Camera opened, but automatic QR reading is not supported in this browser.");
+        return;
+      }
 
       const detector = new BarcodeDetectorCtor({ formats: ["qr_code"] });
       let active = true;
