@@ -351,15 +351,30 @@ a {
   -webkit-user-select: text;
 }
 
+.thermal-receipt {
+  display: none;
+}
+
+@page {
+  size: 80mm 180mm;
+  margin: 0;
+}
+
 @media print {
+  html,
+  body {
+    width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
   body * {
     visibility: hidden !important;
   }
 
-  .entry-receipt-print-backdrop,
-  .entry-receipt-print-backdrop *,
-  .entry-receipt-print,
-  .entry-receipt-print * {
+  .thermal-receipt,
+  .thermal-receipt * {
     visibility: visible !important;
   }
 
@@ -372,29 +387,119 @@ a {
     backdrop-filter: none !important;
   }
 
-  .entry-receipt-print {
-    position: static !important;
-    width: 325px !important;
-    max-width: 325px !important;
-    margin: 0 auto !important;
-    border: 0 !important;
-    border-radius: 6px !important;
-    box-shadow: none !important;
-    color: #020617 !important;
-    background: white !important;
-  }
-
-  .entry-receipt-floor {
-    background: #eaf6ff !important;
-    page-break-inside: avoid;
-  }
-
-  .entry-receipt-project {
-    page-break-inside: avoid;
-  }
-
-  .entry-receipt-print button,
+  .entry-receipt-print,
   .entry-receipt-action {
     display: none !important;
+  }
+
+  .thermal-receipt {
+    display: block !important;
+    position: static !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 auto !important;
+    padding: 4mm !important;
+    box-sizing: border-box !important;
+    color: #000 !important;
+    background: white !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 10pt !important;
+    line-height: 1.15 !important;
+    page-break-inside: avoid !important;
+  }
+
+  .thermal-title {
+    text-align: center !important;
+    font-size: 16pt !important;
+    font-weight: 900 !important;
+    text-transform: uppercase !important;
+    line-height: 1.05 !important;
+  }
+
+  .thermal-subtitle {
+    text-align: center !important;
+    font-size: 10pt !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.08em !important;
+    margin-top: 1mm !important;
+  }
+
+  .thermal-qr {
+    display: flex !important;
+    justify-content: center !important;
+    margin: 4mm 0 2mm !important;
+  }
+
+  .thermal-qr img {
+    width: 32mm !important;
+    height: 32mm !important;
+  }
+
+  .thermal-session {
+    text-align: center !important;
+    font-size: 10pt !important;
+    font-weight: 900 !important;
+    margin-bottom: 2mm !important;
+  }
+
+  .thermal-rule {
+    border-top: 1px dashed #000 !important;
+    margin: 2.5mm 0 !important;
+  }
+
+  .thermal-center-label {
+    text-align: center !important;
+    font-size: 9pt !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.08em !important;
+  }
+
+  .thermal-floor {
+    text-align: center !important;
+    font-size: 30pt !important;
+    font-weight: 900 !important;
+    line-height: 1 !important;
+    margin-top: 1mm !important;
+  }
+
+  .thermal-floor-name,
+  .thermal-project-name {
+    text-align: center !important;
+    font-size: 9pt !important;
+    font-weight: 700 !important;
+  }
+
+  .thermal-field {
+    margin: 2mm 0 !important;
+    page-break-inside: avoid !important;
+  }
+
+  .thermal-label {
+    font-size: 8pt !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.08em !important;
+  }
+
+  .thermal-value {
+    font-size: 10pt !important;
+    font-weight: 900 !important;
+  }
+
+  .thermal-muted {
+    font-size: 9pt !important;
+    font-weight: 600 !important;
+  }
+
+  .thermal-footer {
+    text-align: center !important;
+    font-size: 9pt !important;
+    font-weight: 700 !important;
+  }
+
+  .thermal-thanks {
+    text-align: center !important;
+    font-size: 12pt !important;
+    font-weight: 900 !important;
+    margin-top: 3mm !important;
   }
 }

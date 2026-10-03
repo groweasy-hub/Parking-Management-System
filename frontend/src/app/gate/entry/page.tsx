@@ -1663,6 +1663,55 @@ export default function EntryGatePage() {
               </div>
             </div>
 
+            <div className="thermal-receipt">
+              <div className="thermal-title">{currentProject?.name ?? "PARKNEST"}</div>
+              <div className="thermal-subtitle">ENTRY RECEIPT</div>
+              <div className="thermal-qr">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={entryReceipt.qrImageUrl} alt="Parking QR code" />
+              </div>
+              <div className="thermal-session">SESSION: {entryReceipt.sessionCode}</div>
+              <div className="thermal-rule" />
+              <div className="thermal-center-label">PARK VEHICLE AT</div>
+              <div className="thermal-floor">{entryReceipt.qrPayload.floorCode || entryReceipt.qrPayload.floorName}</div>
+              <div className="thermal-floor-name">{entryReceipt.qrPayload.floorName}</div>
+              <div className="thermal-project-name">{currentProject?.name ?? "Parking Project"}</div>
+              <div className="thermal-rule" />
+              <div className="thermal-field">
+                <div className="thermal-label">VEHICLE</div>
+                <div className="thermal-value">{entryReceipt.vehicleType}</div>
+                <div className="thermal-muted">{entryReceipt.vehicleNumber || "No vehicle number recorded"}</div>
+              </div>
+              <div className="thermal-field">
+                <div className="thermal-label">DESTINATION</div>
+                <div className="thermal-value">{entryReceipt.qrPayload.companyName}</div>
+                <div className="thermal-muted">Parking: {entryReceipt.qrPayload.floorCode || entryReceipt.qrPayload.floorName}</div>
+              </div>
+              <div className="thermal-field">
+                <div className="thermal-label">ENTRY GATE</div>
+                <div className="thermal-value">{entryReceipt.entryGateName || "Entry Gate"}</div>
+              </div>
+              <div className="thermal-field">
+                <div className="thermal-label">ENTRY TIME</div>
+                <div className="thermal-value">
+                  {new Date(entryReceipt.entryTime)
+                    .toLocaleString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                      hour12: true,
+                    })
+                    .replace(",", "  ")}
+                </div>
+              </div>
+              <div className="thermal-rule" />
+              <div className="thermal-footer">Scan this QR at exit</div>
+              <div className="thermal-thanks">Thank You</div>
+            </div>
+
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
