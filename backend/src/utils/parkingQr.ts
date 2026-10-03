@@ -33,7 +33,9 @@ export function createParkingQrToken(payload: ParkingQrPayload): string {
 
 export function verifyParkingQrToken(input: string): ParkingQrPayload | null {
   const trimmed = input.trim();
-  const token = trimmed.startsWith(`${QR_PREFIX}.`) ? trimmed : trimmed.replace(/^.*?(PARKFLOW\.)/, "$1");
+  const token = trimmed.startsWith(`${QR_PREFIX}.`)
+    ? trimmed
+    : trimmed.match(/PARKFLOW\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/)?.[0] ?? "";
   const [prefix, encoded, signature] = token.split(".");
   if (prefix !== QR_PREFIX || !encoded || !signature) return null;
 

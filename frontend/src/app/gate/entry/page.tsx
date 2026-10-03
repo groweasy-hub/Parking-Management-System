@@ -313,9 +313,10 @@ export default function EntryGatePage() {
           entryGateId: selectedGateId,
         }),
       });
-      const qrImageUrl = await QRCode.toDataURL(data.session.qrToken, {
+      const qrText = buildParkingQrText(data.session, currentProject?.name ?? "Parking Project");
+      const qrImageUrl = await QRCode.toDataURL(qrText, {
         margin: 1,
-        width: 260,
+        width: 360,
         errorCorrectionLevel: "M",
       });
       setEntryReceipt({ ...data.session, qrImageUrl });
@@ -343,6 +344,7 @@ export default function EntryGatePage() {
     companies,
     vehicleNumber,
     vehicleLabel,
+    currentProject?.name,
     loadActiveSessions,
   ]);
 
@@ -2059,6 +2061,23 @@ function formatReceiptTime(value: string) {
       hour12: true,
     })
     .replace(",", "  ");
+}
+
+function buildParkingQrText(receipt: Omit<EntryReceipt, "qrImageUrl">, projectName: string) {
+  const parkingAt = receipt.qrPayload.floorCode || receipt.qrPayload.floorName;
+  return [
+    "Parking Entry Receipt",
+    `Project: ${projectName}`,
+    `Session: ${receipt.sessionCode}`,
+    `Vehicle: ${receipt.vehicleType}`,
+    `Vehicle Number: ${receipt.vehicleNumber || "Not recorded"}`,
+    `Destination: ${receipt.qrPayload.companyName}`,
+    `Parking Floor: ${parkingAt}`,
+    `Floor Name: ${receipt.qrPayload.floorName}`,
+    `Entry Gate: ${receipt.entryGateName || "Entry Gate"}`,
+    `Entry Time: ${formatReceiptTime(receipt.entryTime)}`,
+    `Token: ${receipt.qrToken}`,
+  ].join("\n");
 }
 
 function ReceiptRow({
