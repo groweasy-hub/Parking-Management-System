@@ -447,7 +447,7 @@ export default function ExitGatePage() {
                 </span>
               </div>
               <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
+                <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                   {sessions.length}
                 </span>
                 <span className="text-xs font-semibold text-slate-500">
@@ -555,7 +555,7 @@ export default function ExitGatePage() {
                 <p className="text-[11px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
                   QR Details Found
                 </p>
-                <p className="font-mono text-lg font-black tracking-wide text-slate-900">
+                <p className="font-mono text-base font-black tracking-wide text-slate-900">
                   {qrSession.vehicleNumber || qrSession.sessionCode}
                 </p>
               </div>
@@ -615,7 +615,7 @@ export default function ExitGatePage() {
         <div className="relative">
           <Input
             placeholder="Type vehicle plate (TG 09 GH 1234) or session code..."
-            className="h-13 pl-11 pr-10 text-base uppercase font-mono tracking-wider font-extrabold rounded-xl border-2 border-slate-200 bg-slate-50 focus-visible:border-[#1565C0] focus-visible:ring-[#1565C0]"
+            className="h-13 pl-11 pr-10 text-sm uppercase font-mono tracking-wider font-extrabold rounded-xl border-2 border-slate-200 bg-slate-50 focus-visible:border-[#1565C0] focus-visible:ring-[#1565C0]"
             value={plateQuery}
             onChange={(e) => {
               setPlateQuery(e.target.value.toUpperCase());
@@ -650,7 +650,7 @@ export default function ExitGatePage() {
                       <Badge variant="outline" className="text-xs shrink-0 font-bold">No Plate</Badge>
                     )}
                     <div className="min-w-0">
-                      <p className="text-sm font-bold truncate leading-tight">{fieldName(match.companyId)}</p>
+                      <p className="text-xs font-bold truncate leading-tight">{fieldName(match.companyId)}</p>
                       <p className="text-xs text-muted-foreground truncate">
                         {match.vehicleType} · {fieldName(match.floorId)} · {formatDuration(match.entryTime)} inside
                       </p>
@@ -703,7 +703,7 @@ export default function ExitGatePage() {
                   <Icon className="h-6 w-6 sm:h-7 sm:w-7" />
                 </div>
 
-                <p className="text-sm sm:text-base font-bold tracking-tight text-slate-900 dark:text-white">{label}</p>
+                <p className="text-xs sm:text-sm font-bold tracking-tight text-slate-900 dark:text-white">{label}</p>
 
                 {/* Count Badge */}
                 <span
@@ -751,7 +751,7 @@ export default function ExitGatePage() {
             <div className="space-y-3 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm animate-in fade-in dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between pb-2 border-b">
                 <div>
-                  <h3 className="font-extrabold text-sm sm:text-base">
+                  <h3 className="text-xs font-extrabold sm:text-sm">
                     {companyList.find((c) => c.id === activeCompanyFilter)?.name}
                   </h3>
                   <p className="text-xs text-muted-foreground">
@@ -809,7 +809,7 @@ export default function ExitGatePage() {
             <div className="space-y-3 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm animate-in fade-in dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between pb-2 border-b">
                 <div>
-                  <h3 className="font-extrabold text-sm sm:text-base">
+                  <h3 className="text-xs font-extrabold sm:text-sm">
                     {floorList.find((f) => f.id === activeFloorFilter)?.name}
                   </h3>
                   <p className="text-xs text-muted-foreground">
@@ -900,7 +900,7 @@ export default function ExitGatePage() {
                 <div className="space-y-2">
                   {companyList.length === 0 ? (
                     <div className="py-10 text-center text-muted-foreground bg-card rounded-2xl border p-4">
-                      <p className="font-bold text-sm">No {selectedVehicleType}s currently parked.</p>
+                      <p className="text-xs font-bold">No {selectedVehicleType}s currently parked.</p>
                       <p className="text-xs mt-1">All {selectedVehicleType} slots for all companies are empty.</p>
                     </div>
                   ) : (
@@ -926,7 +926,7 @@ export default function ExitGatePage() {
                           )}
 
                           <div className="min-w-0">
-                            <p className="font-extrabold text-sm sm:text-base leading-tight truncate">
+                            <p className="text-xs font-extrabold leading-tight truncate sm:text-sm">
                               {company.name}
                             </p>
                             <p className="text-xs text-muted-foreground mt-0.5">
@@ -961,7 +961,7 @@ export default function ExitGatePage() {
                 <div className="space-y-2">
                   {floorList.length === 0 ? (
                     <div className="py-10 text-center text-muted-foreground bg-card rounded-2xl border p-4">
-                      <p className="font-bold text-sm">No {selectedVehicleType}s currently parked on any floor.</p>
+                      <p className="text-xs font-bold">No {selectedVehicleType}s currently parked on any floor.</p>
                     </div>
                   ) : (
                     floorList.map((floor) => (
@@ -977,7 +977,7 @@ export default function ExitGatePage() {
                           </div>
 
                           <div className="min-w-0">
-                            <p className="font-extrabold text-sm sm:text-base leading-tight truncate">
+                            <p className="text-xs font-extrabold leading-tight truncate sm:text-sm">
                               {floor.name}
                             </p>
                             <p className="text-xs text-muted-foreground mt-0.5">
@@ -1094,7 +1094,7 @@ export default function ExitGatePage() {
                 {confirmSession?.sessionCode}
               </span>
             </div>
-            <DialogTitle className="text-xl font-black tracking-tight">
+            <DialogTitle className="text-lg font-black tracking-tight">
               Confirm Vehicle Exit
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
@@ -1110,7 +1110,7 @@ export default function ExitGatePage() {
                   Vehicle License Plate
                 </p>
                 {confirmSession.vehicleNumber ? (
-                  <span className="license-plate px-4 py-1.5 text-base sm:text-lg">
+                  <span className="license-plate px-4 py-1.5 text-sm sm:text-base">
                     {confirmSession.vehicleNumber}
                   </span>
                 ) : (
@@ -1126,7 +1126,7 @@ export default function ExitGatePage() {
                   <span className="text-muted-foreground font-semibold flex items-center gap-1.5">
                     <Building2 className="h-3.5 w-3.5" /> Company
                   </span>
-                  <span className="font-bold text-foreground text-sm">
+                  <span className="text-xs font-bold text-foreground">
                     {fieldName(confirmSession.companyId)}
                   </span>
                 </div>
@@ -1162,7 +1162,7 @@ export default function ExitGatePage() {
                   <span className="text-muted-foreground font-semibold flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5 text-emerald-500" /> Parked Duration
                   </span>
-                  <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm">
+                  <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">
                     {formatDuration(confirmSession.entryTime)}
                   </span>
                 </div>
@@ -1175,7 +1175,7 @@ export default function ExitGatePage() {
               size="lg"
               disabled={submitting || !selectedGateId}
               onClick={handleConfirmExit}
-              className="gate-press w-full h-14 text-base font-black tracking-wide rounded-2xl bg-[#1565C0] hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2"
+              className="gate-press w-full h-14 text-sm font-black tracking-wide rounded-2xl bg-[#1565C0] hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2"
             >
               {submitting ? (
                 <>
