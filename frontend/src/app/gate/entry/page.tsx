@@ -316,8 +316,8 @@ export default function EntryGatePage() {
       const qrText = buildParkingQrText(data.session, currentProject?.name ?? "Parking Project");
       const qrImageUrl = await QRCode.toDataURL(qrText, {
         margin: 1,
-        width: 360,
-        errorCorrectionLevel: "M",
+        width: 520,
+        errorCorrectionLevel: "Q",
       });
       setEntryReceipt({ ...data.session, qrImageUrl });
 
@@ -376,11 +376,11 @@ export default function EntryGatePage() {
   <meta charset="utf-8" />
   <title>${escapeHtml(projectName)} - Entry Receipt</title>
   <style>
-    @page { size: 80mm 220mm; margin: 0; }
+    @page { size: 80mm 240mm; margin: 0; }
     * { box-sizing: border-box; }
     html, body {
       width: 80mm;
-      height: 220mm;
+      height: 240mm;
       margin: 0;
       padding: 0;
       overflow: hidden;
@@ -390,7 +390,7 @@ export default function EntryGatePage() {
     }
     .receipt {
       width: 80mm;
-      height: 220mm;
+      height: 240mm;
       padding: 4mm;
       overflow: hidden;
       font-size: 10pt;
@@ -416,8 +416,8 @@ export default function EntryGatePage() {
       margin: 4mm 0 2mm;
     }
     .qr img {
-      width: 32mm;
-      height: 32mm;
+      width: 42mm;
+      height: 42mm;
     }
     .session {
       text-align: center;
@@ -1765,7 +1765,7 @@ export default function EntryGatePage() {
               </div>
 
               <div className="flex flex-col items-center px-4 pb-2 pt-1">
-                <div className="w-[122px] bg-white p-1">
+                <div className="w-[156px] bg-white p-1">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={entryReceipt.qrImageUrl} alt="Parking QR code" className="h-auto w-full" />
                 </div>
@@ -2066,16 +2066,15 @@ function formatReceiptTime(value: string) {
 function buildParkingQrText(receipt: Omit<EntryReceipt, "qrImageUrl">, projectName: string) {
   const parkingAt = receipt.qrPayload.floorCode || receipt.qrPayload.floorName;
   return [
-    "Parking Entry Receipt",
+    "Parking Receipt",
     `Project: ${projectName}`,
     `Session: ${receipt.sessionCode}`,
     `Vehicle: ${receipt.vehicleType}`,
-    `Vehicle Number: ${receipt.vehicleNumber || "Not recorded"}`,
+    `Vehicle No: ${receipt.vehicleNumber || "Not recorded"}`,
     `Destination: ${receipt.qrPayload.companyName}`,
-    `Parking Floor: ${parkingAt}`,
-    `Floor Name: ${receipt.qrPayload.floorName}`,
-    `Entry Gate: ${receipt.entryGateName || "Entry Gate"}`,
-    `Entry Time: ${formatReceiptTime(receipt.entryTime)}`,
+    `Floor: ${parkingAt}`,
+    `Gate: ${receipt.entryGateName || "Entry Gate"}`,
+    `Time: ${formatReceiptTime(receipt.entryTime)}`,
     `Token: ${receipt.qrToken}`,
   ].join("\n");
 }

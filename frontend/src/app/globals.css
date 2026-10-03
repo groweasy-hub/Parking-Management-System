@@ -356,7 +356,7 @@ a {
 }
 
 @page {
-  size: 80mm 220mm;
+  size: 80mm 240mm;
   margin: 0;
 }
 
@@ -443,8 +443,8 @@ a {
   }
 
   .thermal-qr img {
-    width: 32mm !important;
-    height: 32mm !important;
+    width: 42mm !important;
+    height: 42mm !important;
   }
 
   .thermal-session {

@@ -27,7 +27,13 @@ function sign(payload: string): string {
 }
 
 export function createParkingQrToken(payload: ParkingQrPayload): string {
-  const encoded = base64UrlEncode(JSON.stringify(payload));
+  const encoded = base64UrlEncode(
+    JSON.stringify({
+      sessionId: payload.sessionId,
+      sessionCode: payload.sessionCode,
+      projectId: payload.projectId,
+    })
+  );
   return `${QR_PREFIX}.${encoded}.${sign(encoded)}`;
 }
 
