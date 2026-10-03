@@ -603,7 +603,7 @@ export default function ExitGatePage() {
 
         <div className="relative">
           <Input
-            placeholder="Type vehicle plate (TG 09 GH 1234) or session code..."
+            placeholder="TG 09 HH 1234"
             className="h-12 rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-10 font-mono text-xs font-extrabold uppercase tracking-[0.16em] focus-visible:border-[#1565C0] focus-visible:ring-[#1565C0]"
             value={plateQuery}
             onChange={(e) => {
