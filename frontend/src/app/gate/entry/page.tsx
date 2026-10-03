@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { toast } from "sonner";
@@ -37,6 +37,7 @@ import {
   Copy,
   Printer,
   QrCode,
+  MapPin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -1539,7 +1540,154 @@ export default function EntryGatePage() {
 
       {entryReceipt && (
         <div className="entry-receipt-print-backdrop fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:items-center">
-          <div className="entry-receipt-print w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+          <div className="w-full max-w-[325px]">
+            <div className="entry-receipt-print overflow-hidden rounded-[6px] bg-white shadow-2xl">
+              <div className="relative bg-gradient-to-r from-[#18A765] to-[#279D5F] px-4 py-3 text-white">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#18A765]">
+                    <Check className="h-6 w-6 stroke-[4]" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-base font-black uppercase leading-tight tracking-wide">
+                      Parking QR Generated
+                    </p>
+                    <p className="text-xs font-medium leading-tight">Entry Receipt</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEntryReceipt(null)}
+                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
+                  title="Close receipt"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="px-2 py-2">
+                <div className="flex items-center justify-center gap-2 rounded-[5px] bg-[#E6F8EC] px-3 py-2 text-[10px] font-bold text-[#116C45]">
+                  <Info className="h-3.5 w-3.5 shrink-0 fill-[#116C45] text-[#116C45]" />
+                  <span>Show this QR at exit for quick vehicle lookup.</span>
+                </div>
+              </div>
+
+              <div className="entry-receipt-project px-4 pb-1 text-center">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7890AF]">Project</p>
+                <p className="text-xl font-black leading-tight text-[#143B73]">
+                  {currentProject?.name ?? "Parking Project"}
+                </p>
+              </div>
+
+              <div className="flex flex-col items-center px-4 pb-2 pt-1">
+                <div className="w-[122px] bg-white p-1">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={entryReceipt.qrImageUrl} alt="Parking QR code" className="h-auto w-full" />
+                </div>
+                <div className="mt-1 w-[165px] rounded-[6px] bg-[#EAF4FF] py-2 text-center">
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#7890AF]">Session</p>
+                  <p className="font-mono text-base font-black leading-none text-[#094C9B]">
+                    {entryReceipt.sessionCode}
+                  </p>
+                </div>
+              </div>
+
+              <div className="entry-receipt-floor relative overflow-hidden bg-[#EAF6FF] px-4 py-3 text-center">
+                <div className="flex items-center justify-center gap-1.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1D5D9B] text-white">
+                    <MapPin className="h-3.5 w-3.5 fill-white" />
+                  </span>
+                  <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#5E769B]">
+                    Park Vehicle At
+                  </p>
+                </div>
+                <p className="mt-1 font-mono text-[34px] font-black leading-none text-[#083A8D]">
+                  {entryReceipt.qrPayload.floorCode || entryReceipt.qrPayload.floorName}
+                </p>
+                <p className="mt-1 text-[11px] font-bold leading-tight text-[#3E4E6A]">
+                  {entryReceipt.qrPayload.floorName}
+                </p>
+                <p className="text-[11px] font-black leading-tight text-[#143B73]">
+                  {currentProject?.name ?? "Parking Project"}
+                </p>
+                <Car className="pointer-events-none absolute bottom-2 right-6 h-14 w-14 text-[#C9E3F6]" />
+                <div className="pointer-events-none absolute right-4 top-5 rounded bg-white/45 px-2 py-1 text-xl font-black text-[#C9E3F6]">
+                  P
+                </div>
+              </div>
+
+              <div className="px-4 py-2">
+                <ReceiptRow
+                  icon={<Car className="h-4 w-4" />}
+                  iconClassName="bg-[#E8F1FA] text-[#416A92]"
+                  label="Vehicle"
+                  value={`${entryReceipt.vehicleNumber || "No vehicle number recorded"} | ${entryReceipt.vehicleType}`}
+                />
+                <ReceiptRow
+                  icon={<Building2 className="h-4 w-4" />}
+                  iconClassName="bg-[#E1F7E9] text-[#20A160]"
+                  label="Destination"
+                  value={entryReceipt.qrPayload.companyName}
+                  subValue={`Parking: ${entryReceipt.qrPayload.floorCode || entryReceipt.qrPayload.floorName}`}
+                />
+                <ReceiptRow
+                  icon={<LayoutGrid className="h-4 w-4" />}
+                  iconClassName="bg-[#FFE8D7] text-[#FF7A32]"
+                  label="Entry Gate"
+                  value={entryReceipt.entryGateName || "Entry Gate"}
+                />
+                <ReceiptRow
+                  icon={<Clock className="h-4 w-4" />}
+                  iconClassName="bg-[#F0EAFF] text-[#6B5FC7]"
+                  label="Entry Time"
+                  value={new Date(entryReceipt.entryTime)
+                    .toLocaleString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                      hour12: true,
+                    })
+                    .replace(",", " |")}
+                />
+              </div>
+
+              <div className="bg-[#DFF7EA] px-4 py-2 text-center">
+                <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-[#116C45]">
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#15945A] text-white">
+                    <Check className="h-2.5 w-2.5 stroke-[4]" />
+                  </span>
+                  <span>Keep this QR ready while exiting.</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(entryReceipt.qrToken).then(
+                    () => toast.success("QR token copied."),
+                    () => toast.error("Unable to copy QR token.")
+                  );
+                }}
+                className="entry-receipt-action flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-700 hover:bg-slate-50"
+              >
+                <Copy className="h-4 w-4" />
+                Copy
+              </button>
+              <button
+                type="button"
+                onClick={() => window.setTimeout(() => window.print(), 100)}
+                className="entry-receipt-action flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1565C0] text-sm font-black text-white hover:bg-blue-700"
+              >
+                <Printer className="h-4 w-4" />
+                Print
+              </button>
+            </div>
+          </div>
+          <div className="hidden">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-emerald-700">
@@ -1653,6 +1801,33 @@ export default function EntryGatePage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ReceiptRow({
+  icon,
+  iconClassName,
+  label,
+  value,
+  subValue,
+}: {
+  icon: ReactNode;
+  iconClassName: string;
+  label: string;
+  value: string;
+  subValue?: string;
+}) {
+  return (
+    <div className="flex gap-3 border-b border-[#E7EDF5] py-2 last:border-b-0">
+      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[5px] ${iconClassName}`}>
+        {icon}
+      </div>
+      <div className="min-w-0 pt-0.5">
+        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#7890AF]">{label}</p>
+        <p className="text-[11px] font-black leading-tight text-[#173D72]">{value}</p>
+        {subValue && <p className="text-[11px] font-semibold leading-tight text-[#4A5D78]">{subValue}</p>}
+      </div>
     </div>
   );
 }

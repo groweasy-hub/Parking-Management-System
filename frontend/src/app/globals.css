@@ -374,52 +374,27 @@ a {
 
   .entry-receipt-print {
     position: static !important;
-    width: 100% !important;
-    max-width: none !important;
+    width: 325px !important;
+    max-width: 325px !important;
+    margin: 0 auto !important;
     border: 0 !important;
-    border-radius: 0 !important;
+    border-radius: 6px !important;
     box-shadow: none !important;
     color: #020617 !important;
     background: white !important;
   }
 
   .entry-receipt-floor {
-    border: 4px solid #000 !important;
-    background: #fff !important;
+    background: #eaf6ff !important;
     page-break-inside: avoid;
-  }
-
-  .entry-receipt-floor p:first-child {
-    color: #000 !important;
-    font-size: 18pt !important;
-  }
-
-  .entry-receipt-floor p:nth-child(2) {
-    color: #000 !important;
-    font-size: 56pt !important;
-    line-height: 1 !important;
   }
 
   .entry-receipt-project {
-    background: #fff !important;
-    color: #000 !important;
-    border: 3px solid #000 !important;
     page-break-inside: avoid;
   }
 
-  .entry-receipt-project p:first-child {
-    color: #000 !important;
-    font-size: 14pt !important;
-  }
-
-  .entry-receipt-project p:nth-child(2) {
-    color: #000 !important;
-    font-size: 30pt !important;
-    line-height: 1.1 !important;
-    text-align: center !important;
-  }
-
-  .entry-receipt-print button {
+  .entry-receipt-print button,
+  .entry-receipt-action {
     display: none !important;
   }
 }
