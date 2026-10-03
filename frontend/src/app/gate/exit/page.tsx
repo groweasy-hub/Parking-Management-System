@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
+import jsQR from "jsqr";
 import { toast } from "sonner";
 import { useProject } from "@/lib/project-context";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -274,18 +275,26 @@ export default function ExitGatePage() {
       video.srcObject = stream;
       await video.play();
 
-      if (!BarcodeDetectorCtor) {
-        toast.error("Camera opened, but automatic QR reading is not supported in this browser.");
-        return;
-      }
-
-      const detector = new BarcodeDetectorCtor({ formats: ["qr_code"] });
       let active = true;
+      const detector = BarcodeDetectorCtor ? new BarcodeDetectorCtor({ formats: ["qr_code"] }) : null;
+      const canvas = detector ? null : document.createElement("canvas");
+      const context = canvas?.getContext("2d", { willReadFrequently: true }) ?? null;
+
       const scan = async () => {
         if (!active || !qrStreamRef.current || !qrVideoRef.current) return;
         try {
-          const codes = await detector.detect(qrVideoRef.current);
-          const value = codes[0]?.rawValue;
+          let value: string | undefined;
+          if (detector) {
+            const codes = await detector.detect(qrVideoRef.current);
+            value = codes[0]?.rawValue;
+          } else if (canvas && context && qrVideoRef.current.videoWidth > 0 && qrVideoRef.current.videoHeight > 0) {
+            canvas.width = qrVideoRef.current.videoWidth;
+            canvas.height = qrVideoRef.current.videoHeight;
+            context.drawImage(qrVideoRef.current, 0, 0, canvas.width, canvas.height);
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            value = jsQR(imageData.data, imageData.width, imageData.height)?.data;
+          }
+
           if (value) {
             active = false;
             await fetchQrSession(value);
