@@ -242,14 +242,6 @@ export default function ExitGatePage() {
   );
 
   const startQrScanner = useCallback(async () => {
-    const BarcodeDetectorCtor = (
-      window as unknown as {
-        BarcodeDetector?: new (options: { formats: string[] }) => {
-          detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue: string }>>;
-        };
-      }
-    ).BarcodeDetector;
-
     if (!navigator.mediaDevices?.getUserMedia) {
       toast.error("Camera access is not available in this browser.");
       return;
@@ -276,18 +268,14 @@ export default function ExitGatePage() {
       await video.play();
 
       let active = true;
-      const detector = BarcodeDetectorCtor ? new BarcodeDetectorCtor({ formats: ["qr_code"] }) : null;
-      const canvas = detector ? null : document.createElement("canvas");
-      const context = canvas?.getContext("2d", { willReadFrequently: true }) ?? null;
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d", { willReadFrequently: true });
 
       const scan = async () => {
         if (!active || !qrStreamRef.current || !qrVideoRef.current) return;
         try {
           let value: string | undefined;
-          if (detector) {
-            const codes = await detector.detect(qrVideoRef.current);
-            value = codes[0]?.rawValue;
-          } else if (canvas && context && qrVideoRef.current.videoWidth > 0 && qrVideoRef.current.videoHeight > 0) {
+          if (context && qrVideoRef.current.videoWidth > 0 && qrVideoRef.current.videoHeight > 0) {
             canvas.width = qrVideoRef.current.videoWidth;
             canvas.height = qrVideoRef.current.videoHeight;
             context.drawImage(qrVideoRef.current, 0, 0, canvas.width, canvas.height);
