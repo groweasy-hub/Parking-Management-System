@@ -19,6 +19,7 @@ export interface EntryInput {
   projectId: string;
   companyId: string;
   floorId: string;
+  allocationId?: string;
   vehicleType: VehicleType;
   vehicleNumber?: string | null;
   entryGateId: string;
@@ -75,13 +76,24 @@ export async function createEntry(input: EntryInput) {
     floorId: input.floorId,
   });
 
-  const allocation = await ParkingAllocation.findOne({
+  const allocationFilter: Record<string, unknown> = {
     projectId: input.projectId,
-    companyId: input.companyId,
     floorId: input.floorId,
     vehicleType: allocationVehicleType,
     status: "ACTIVE",
-  }).lean();
+  };
+  if (input.allocationId) allocationFilter._id = input.allocationId;
+  if (input.vehicleType !== "OTHER" || !input.allocationId) allocationFilter.companyId = input.companyId;
+
+  let allocation = await ParkingAllocation.findOne(allocationFilter).lean();
+  if (!allocation && input.vehicleType === "OTHER" && !input.allocationId) {
+    allocation = await ParkingAllocation.findOne({
+      projectId: input.projectId,
+      floorId: input.floorId,
+      vehicleType: allocationVehicleType,
+      status: "ACTIVE",
+    }).lean();
+  }
 
   if (!allocation) {
     throw AppError.badRequest(

@@ -50,7 +50,11 @@ export async function getCompanyAvailability(
   };
   if (floorId) filter.floorId = new Types.ObjectId(floorId);
 
-  const allocations = await ParkingAllocation.find(filter).lean();
+  let allocations = await ParkingAllocation.find(filter).lean();
+  if (allocations.length === 0 && vehicleType === "OTHER") {
+    delete filter.companyId;
+    allocations = await ParkingAllocation.find(filter).lean();
+  }
   if (allocations.length === 0) return [];
 
   const floorIds = allocations.map((a) => a.floorId);
