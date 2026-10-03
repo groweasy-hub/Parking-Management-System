@@ -1562,6 +1562,18 @@ export default function EntryGatePage() {
               </button>
             </div>
 
+            <div className="mt-4 rounded-2xl border-2 border-[#1565C0] bg-blue-50 p-4 text-center dark:bg-blue-950/30">
+              <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#1565C0] dark:text-blue-300">
+                Park Vehicle At
+              </p>
+              <p className="mt-1 font-mono text-4xl font-black leading-none tracking-wide text-slate-950 dark:text-white sm:text-5xl">
+                {entryReceipt.qrPayload.floorCode || entryReceipt.qrPayload.floorName}
+              </p>
+              <p className="mt-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+                {entryReceipt.qrPayload.floorName}
+              </p>
+            </div>
+
             <div className="mt-4 grid gap-4 sm:grid-cols-[180px_1fr]">
               <div className="rounded-2xl border-2 border-slate-900 bg-white p-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1587,8 +1599,7 @@ export default function EntryGatePage() {
                     {entryReceipt.qrPayload.companyName}
                   </p>
                   <p className="text-slate-500">
-                    Parking: {entryReceipt.qrPayload.floorName}
-                    {entryReceipt.qrPayload.floorCode ? ` (${entryReceipt.qrPayload.floorCode})` : ""}
+                    Parking: {entryReceipt.qrPayload.floorCode || entryReceipt.qrPayload.floorName}
                   </p>
                 </div>
                 <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
