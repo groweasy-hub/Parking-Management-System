@@ -1712,7 +1712,7 @@ export default function EntryGatePage() {
               <div className="thermal-thanks">Thank You</div>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="entry-receipt-actions mt-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => {

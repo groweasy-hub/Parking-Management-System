@@ -356,7 +356,7 @@ a {
 }
 
 @page {
-  size: 80mm 180mm;
+  size: 80mm 220mm;
   margin: 0;
 }
 
@@ -364,9 +364,11 @@ a {
   html,
   body {
     width: 80mm !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
+    overflow: visible !important;
   }
 
   body * {
@@ -387,7 +389,14 @@ a {
     backdrop-filter: none !important;
   }
 
+  .entry-receipt-print-backdrop > div {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+  }
+
   .entry-receipt-print,
+  .entry-receipt-actions,
   .entry-receipt-action {
     display: none !important;
   }
@@ -406,6 +415,9 @@ a {
     font-size: 10pt !important;
     line-height: 1.15 !important;
     page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
   }
 
   .thermal-title {
