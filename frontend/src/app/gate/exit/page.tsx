@@ -108,6 +108,12 @@ function VehicleTypeIllustration({ type, className }: { type: VehicleType; class
   return <OthersIllustration className={className} />;
 }
 
+function waitForNextFrame() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+}
+
 export default function ExitGatePage() {
   const router = useRouter();
   const { currentProjectId } = useProject();
@@ -249,13 +255,21 @@ export default function ExitGatePage() {
 
     try {
       setQrScanning(true);
+      await waitForNextFrame();
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" } },
         audio: false,
       });
       qrStreamRef.current = stream;
       const video = qrVideoRef.current;
-      if (!video) return;
+      if (!video) {
+        stream.getTracks().forEach((track) => track.stop());
+        qrStreamRef.current = null;
+        setQrScanning(false);
+        toast.error("Unable to open camera preview.");
+        return;
+      }
       video.srcObject = stream;
       await video.play();
 
