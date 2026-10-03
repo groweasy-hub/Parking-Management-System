@@ -688,8 +688,8 @@ export default function ExitGatePage() {
                       : "border-slate-200 bg-white hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700"
                   )}
                 >
-                <div className="mb-1.5 flex h-11 w-11 items-center justify-center rounded-full bg-[#EBF3FC] text-[#1565C0]">
-                  <Icon className="h-5 w-6" />
+                <div className="mb-1.5 flex h-13 w-13 items-center justify-center rounded-full bg-[#EBF3FC] text-[#1565C0]">
+                  <Icon className="h-7 w-9" />
                 </div>
 
                 <p className="text-[11px] font-black tracking-tight text-slate-900 dark:text-white">{label}</p>
