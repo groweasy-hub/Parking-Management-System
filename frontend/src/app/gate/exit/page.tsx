@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useProject } from "@/lib/project-context";
@@ -36,6 +36,8 @@ import {
   ChevronRight,
   RefreshCw,
   X,
+  Camera,
+  QrCode,
 } from "lucide-react";
 
 interface VehicleTypeConfig {
@@ -121,6 +123,12 @@ export default function ExitGatePage() {
 
   // Direct Vehicle Plate / Code Search
   const [plateQuery, setPlateQuery] = useState("");
+  const [qrToken, setQrToken] = useState("");
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrScanning, setQrScanning] = useState(false);
+  const [qrScanSupported, setQrScanSupported] = useState(true);
+  const qrVideoRef = useRef<HTMLVideoElement | null>(null);
+  const qrStreamRef = useRef<MediaStream | null>(null);
 
   // Target session for Exit Confirmation (renders in high-visibility ticket dialog)
   const [confirmSession, setConfirmSession] = useState<ParkingSessionRecord | null>(null);
@@ -181,6 +189,93 @@ export default function ExitGatePage() {
     setActiveFloorFilter(null);
     setPlateQuery("");
   }, []);
+
+  const stopQrScanner = useCallback(() => {
+    qrStreamRef.current?.getTracks().forEach((track) => track.stop());
+    qrStreamRef.current = null;
+    setQrScanning(false);
+  }, []);
+
+  useEffect(() => {
+    return () => stopQrScanner();
+  }, [stopQrScanner]);
+
+  const fetchQrSession = useCallback(
+    async (token: string) => {
+      const trimmed = token.trim();
+      if (!trimmed) {
+        toast.error("Scan or paste a parking QR first.");
+        return;
+      }
+      setQrLoading(true);
+      try {
+        const data = await apiFetch<{ session: ParkingSessionRecord }>(
+          `/api/parking/qr?token=${encodeURIComponent(trimmed)}`
+        );
+        setConfirmSession(data.session);
+        setQrToken("");
+        stopQrScanner();
+      } catch (err) {
+        toast.error(err instanceof ApiError ? err.message : "Unable to read this parking QR.");
+      } finally {
+        setQrLoading(false);
+      }
+    },
+    [stopQrScanner]
+  );
+
+  const startQrScanner = useCallback(async () => {
+    const BarcodeDetectorCtor = (
+      window as unknown as {
+        BarcodeDetector?: new (options: { formats: string[] }) => {
+          detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue: string }>>;
+        };
+      }
+    ).BarcodeDetector;
+
+    if (!BarcodeDetectorCtor || !navigator.mediaDevices?.getUserMedia) {
+      setQrScanSupported(false);
+      toast.error("Camera QR scan is not supported on this browser. Paste the QR token instead.");
+      return;
+    }
+
+    try {
+      setQrScanSupported(true);
+      setQrScanning(true);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+      qrStreamRef.current = stream;
+      const video = qrVideoRef.current;
+      if (!video) return;
+      video.srcObject = stream;
+      await video.play();
+
+      const detector = new BarcodeDetectorCtor({ formats: ["qr_code"] });
+      let active = true;
+      const scan = async () => {
+        if (!active || !qrStreamRef.current || !qrVideoRef.current) return;
+        try {
+          const codes = await detector.detect(qrVideoRef.current);
+          const value = codes[0]?.rawValue;
+          if (value) {
+            active = false;
+            setQrToken(value);
+            await fetchQrSession(value);
+            return;
+          }
+        } catch {
+          // Keep the scan loop alive; camera frames can fail while focusing.
+        }
+        window.setTimeout(scan, 350);
+      };
+      scan();
+    } catch {
+      setQrScanning(false);
+      toast.error("Unable to start camera. Paste the QR token instead.");
+    }
+  }, [fetchQrSession]);
 
   // Filtered active sessions for the currently selected vehicle type
   const activeSessionsForType = useMemo(() => {
@@ -380,6 +475,63 @@ export default function ExitGatePage() {
             </Button>
           </div>
         </div>
+      </div>
+
+      <div className="rounded-2xl border-2 border-dashed border-primary/30 bg-card p-3.5 sm:p-4 shadow-sm space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <QrCode className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-sm font-black tracking-tight">Optional QR Scan</h2>
+              <p className="text-xs text-muted-foreground">
+                Manual vehicle search below remains the main exit flow.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={qrScanning ? stopQrScanner : startQrScanner}
+              className="h-10 rounded-xl font-bold gap-2"
+            >
+              <Camera className="h-4 w-4" />
+              {qrScanning ? "Stop Scan" : "Scan QR"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => fetchQrSession(qrToken)}
+              disabled={qrLoading}
+              className="h-10 rounded-xl font-bold gap-2"
+            >
+              {qrLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+              Fetch Details
+            </Button>
+          </div>
+        </div>
+
+        {qrScanning && (
+          <div className="overflow-hidden rounded-2xl border bg-black">
+            <video ref={qrVideoRef} className="h-56 w-full object-cover" muted playsInline />
+          </div>
+        )}
+
+        {!qrScanSupported && (
+          <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
+            Camera scanning is unavailable in this browser. Paste the QR token below.
+          </p>
+        )}
+
+        <Input
+          value={qrToken}
+          onChange={(e) => setQrToken(e.target.value)}
+          placeholder="Paste parking QR token here if camera scan is not available"
+          className="h-11 rounded-xl font-mono text-xs"
+        />
       </div>
 
       {/* 2-Column Responsive Layout on Desktop */}

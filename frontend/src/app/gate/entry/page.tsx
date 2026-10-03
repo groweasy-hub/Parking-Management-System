@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import QRCode from "qrcode";
 import { toast } from "sonner";
 import { useProject } from "@/lib/project-context";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -32,6 +33,9 @@ import {
   Truck,
   RefreshCw,
   Clock,
+  Copy,
+  Printer,
+  QrCode,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +47,22 @@ interface AvailabilityState {
   floorName: string;
   floorId: string;
   allocationId: string;
+}
+
+interface EntryReceipt {
+  id: string;
+  sessionCode: string;
+  vehicleType: VehicleType;
+  vehicleNumber: string | null;
+  entryTime: string;
+  status: string;
+  qrToken: string;
+  qrImageUrl: string;
+  qrPayload: {
+    companyName: string;
+    floorName: string;
+    floorCode?: string;
+  };
 }
 
 export default function EntryGatePage() {
@@ -69,6 +89,7 @@ export default function EntryGatePage() {
   const [availability, setAvailability] = useState<AvailabilityState | null>(null);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [entryReceipt, setEntryReceipt] = useState<EntryReceipt | null>(null);
 
   // Gates & Live Active Sessions
   const [entryGates, setEntryGates] = useState<Gate[]>([]);
@@ -277,7 +298,7 @@ export default function EntryGatePage() {
 
     setSubmitting(true);
     try {
-      await apiFetch("/api/parking/entry", {
+      const data = await apiFetch<{ session: Omit<EntryReceipt, "qrImageUrl"> }>("/api/parking/entry", {
         method: "POST",
         body: JSON.stringify({
           projectId: currentProjectId,
@@ -289,6 +310,12 @@ export default function EntryGatePage() {
           entryGateId: selectedGateId,
         }),
       });
+      const qrImageUrl = await QRCode.toDataURL(data.session.qrToken, {
+        margin: 1,
+        width: 260,
+        errorCorrectionLevel: "M",
+      });
+      setEntryReceipt({ ...data.session, qrImageUrl });
 
       toast.success("Entry Allowed · Barrier Opened", {
         description: `${selectedCompany?.name || "Visitor"} · ${vehicleLabel} · ${availability.floorName}`,
@@ -1505,8 +1532,99 @@ export default function EntryGatePage() {
                 </button>
               </div>
             </div>
-          </div>
         </div>
       </div>
-    );
-  }
+
+      {entryReceipt && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:items-center">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-emerald-700">
+                  <QrCode className="h-3.5 w-3.5" />
+                  Parking QR Generated
+                </div>
+                <h2 className="mt-2 text-xl font-black text-slate-950 dark:text-white">
+                  Entry Receipt
+                </h2>
+                <p className="text-xs font-semibold text-slate-500">
+                  Show this QR at exit for quick vehicle lookup.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEntryReceipt(null)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-900"
+                title="Close receipt"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-[180px_1fr]">
+              <div className="rounded-2xl border-2 border-slate-900 bg-white p-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={entryReceipt.qrImageUrl} alt="Parking QR code" className="h-auto w-full" />
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Session</p>
+                  <p className="font-mono text-base font-black text-slate-950 dark:text-white">
+                    {entryReceipt.sessionCode}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Vehicle</p>
+                  <p className="font-bold text-slate-950 dark:text-white">
+                    {entryReceipt.vehicleNumber || "No vehicle number recorded"} · {entryReceipt.vehicleType}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Destination</p>
+                  <p className="font-bold text-slate-950 dark:text-white">
+                    {entryReceipt.qrPayload.companyName}
+                  </p>
+                  <p className="text-slate-500">
+                    Parking: {entryReceipt.qrPayload.floorName}
+                    {entryReceipt.qrPayload.floorCode ? ` (${entryReceipt.qrPayload.floorCode})` : ""}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Entry Time</p>
+                  <p className="font-semibold text-slate-700 dark:text-slate-200">
+                    {new Date(entryReceipt.entryTime).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(entryReceipt.qrToken).then(
+                    () => toast.success("QR token copied."),
+                    () => toast.error("Unable to copy QR token.")
+                  );
+                }}
+                className="flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 text-sm font-black text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200"
+              >
+                <Copy className="h-4 w-4" />
+                Copy
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1565C0] text-sm font-black text-white hover:bg-blue-700"
+              >
+                <Printer className="h-4 w-4" />
+                Print
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

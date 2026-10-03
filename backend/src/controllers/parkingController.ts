@@ -8,6 +8,7 @@ import { VEHICLE_TYPES, SESSION_STATUSES } from "../types/enums";
 import { ensureProjectAccess } from "../middleware/auth";
 import { allocationVehicleTypeFor, getCompanyAvailability } from "../services/availabilityService";
 import { createEntry, completeExit } from "../services/parkingService";
+import { createParkingQrToken, verifyParkingQrToken } from "../utils/parkingQr";
 
 export const availabilityQuerySchema = z.object({
   projectId: z.string().min(1),
@@ -29,6 +30,52 @@ export const exitSchema = z.object({
   sessionId: z.string().min(1),
   exitGateId: z.string().min(1),
 });
+
+export const qrLookupSchema = z.object({
+  token: z.string().min(1),
+});
+
+async function buildSessionReceipt(sessionId: unknown) {
+  const session = await ParkingSession.findById(sessionId)
+    .populate("companyId", "name logoUrl")
+    .populate("floorId", "name code")
+    .populate("entryGateId", "name")
+    .lean();
+
+  if (!session) throw AppError.notFound("Parking session not found.", "SESSION_NOT_FOUND");
+
+  const company = session.companyId as unknown as { _id: unknown; name: string; logoUrl?: string };
+  const floor = session.floorId as unknown as { _id: unknown; name: string; code?: string };
+  const entryGate = session.entryGateId as unknown as { _id: unknown; name: string };
+
+  const qrPayload = {
+    sessionId: String(session._id),
+    sessionCode: session.sessionCode,
+    projectId: String(session.projectId),
+    vehicleNumber: session.vehicleNumber,
+    entryTime: session.entryTime.toISOString(),
+    companyName: company.name,
+    floorName: floor.name,
+    floorCode: floor.code,
+  };
+
+  return {
+    id: session._id,
+    _id: session._id,
+    sessionCode: session.sessionCode,
+    projectId: String(session.projectId),
+    companyId: session.companyId,
+    floorId: session.floorId,
+    vehicleType: session.vehicleType,
+    vehicleNumber: session.vehicleNumber,
+    entryGateId: session.entryGateId,
+    entryGateName: entryGate?.name,
+    entryTime: session.entryTime,
+    status: session.status,
+    qrToken: createParkingQrToken(qrPayload),
+    qrPayload,
+  };
+}
 
 export const getAvailability = asyncHandler(async (req: Request, res: Response) => {
   const { projectId, companyId, vehicleType, floorId } = req.query as unknown as z.infer<
@@ -75,17 +122,7 @@ export const createEntryHandler = asyncHandler(async (req: Request, res: Respons
 
   await GateDuty.updateOne({ _id: duty._id }, { $inc: { entryCount: 1 } });
 
-  res.status(201).json({
-    session: {
-      id: session._id,
-      sessionCode: session.sessionCode,
-      vehicleType: session.vehicleType,
-      vehicleNumber: session.vehicleNumber,
-      entryTime: session.entryTime,
-      status: session.status,
-    },
-    availability,
-  });
+  res.status(201).json({ session: await buildSessionReceipt(session._id), availability });
 });
 
 export const createExitHandler = asyncHandler(async (req: Request, res: Response) => {
@@ -128,6 +165,31 @@ export const listActiveSessionsSchema = z.object({
   floorId: z.string().optional(),
   vehicleNumber: z.string().optional(),
   search: z.string().optional(),
+});
+
+export const getSessionByQr = asyncHandler(async (req: Request, res: Response) => {
+  const { token } = req.query as unknown as z.infer<typeof qrLookupSchema>;
+  const payload = verifyParkingQrToken(token);
+  if (!payload) throw AppError.badRequest("Invalid parking QR code.", "INVALID_QR_CODE");
+
+  ensureProjectAccess(req.user!, payload.projectId);
+
+  const session = await ParkingSession.findOne({
+    _id: payload.sessionId,
+    projectId: payload.projectId,
+    sessionCode: payload.sessionCode,
+    status: "ACTIVE",
+  })
+    .populate("companyId", "name logoUrl")
+    .populate("floorId", "name code")
+    .populate("entryGateId", "name")
+    .lean();
+
+  if (!session) {
+    throw AppError.notFound("This QR code is not linked to an active parking session.", "SESSION_NOT_FOUND");
+  }
+
+  res.json({ session });
 });
 
 export const listActiveSessions = asyncHandler(async (req: Request, res: Response) => {
