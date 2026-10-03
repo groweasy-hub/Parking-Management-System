@@ -346,6 +346,190 @@ export default function EntryGatePage() {
     loadActiveSessions,
   ]);
 
+  const handlePrintReceipt = useCallback(() => {
+    if (!entryReceipt) return;
+
+    const projectName = currentProject?.name ?? "PARKNEST";
+    const parkingAt = entryReceipt.qrPayload.floorCode || entryReceipt.qrPayload.floorName;
+    const printFrame = document.createElement("iframe");
+    printFrame.title = "Parking receipt print";
+    printFrame.style.position = "fixed";
+    printFrame.style.right = "0";
+    printFrame.style.bottom = "0";
+    printFrame.style.width = "0";
+    printFrame.style.height = "0";
+    printFrame.style.border = "0";
+    document.body.appendChild(printFrame);
+
+    const printDocument = printFrame.contentWindow?.document;
+    if (!printDocument) {
+      document.body.removeChild(printFrame);
+      window.print();
+      return;
+    }
+
+    const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(projectName)} - Entry Receipt</title>
+  <style>
+    @page { size: 80mm 220mm; margin: 0; }
+    * { box-sizing: border-box; }
+    html, body {
+      width: 80mm;
+      height: 220mm;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #fff;
+      color: #000;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .receipt {
+      width: 80mm;
+      height: 220mm;
+      padding: 4mm;
+      overflow: hidden;
+      font-size: 10pt;
+      line-height: 1.15;
+    }
+    .title {
+      text-align: center;
+      font-size: 16pt;
+      font-weight: 900;
+      text-transform: uppercase;
+      line-height: 1.05;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 10pt;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      margin-top: 1mm;
+    }
+    .qr {
+      display: flex;
+      justify-content: center;
+      margin: 4mm 0 2mm;
+    }
+    .qr img {
+      width: 32mm;
+      height: 32mm;
+    }
+    .session {
+      text-align: center;
+      font-size: 10pt;
+      font-weight: 900;
+      margin-bottom: 2mm;
+    }
+    .rule {
+      border-top: 1px dashed #000;
+      margin: 2.5mm 0;
+    }
+    .center-label {
+      text-align: center;
+      font-size: 9pt;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+    }
+    .floor {
+      text-align: center;
+      font-size: 30pt;
+      font-weight: 900;
+      line-height: 1;
+      margin-top: 1mm;
+    }
+    .floor-name,
+    .project-name {
+      text-align: center;
+      font-size: 9pt;
+      font-weight: 700;
+    }
+    .field {
+      margin: 2mm 0;
+    }
+    .label {
+      font-size: 8pt;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+    }
+    .value {
+      font-size: 10pt;
+      font-weight: 900;
+    }
+    .muted {
+      font-size: 9pt;
+      font-weight: 600;
+    }
+    .footer {
+      text-align: center;
+      font-size: 9pt;
+      font-weight: 700;
+    }
+    .thanks {
+      text-align: center;
+      font-size: 12pt;
+      font-weight: 900;
+      margin-top: 3mm;
+    }
+  </style>
+</head>
+<body>
+  <main class="receipt">
+    <div class="title">${escapeHtml(projectName)}</div>
+    <div class="subtitle">ENTRY RECEIPT</div>
+    <div class="qr"><img src="${entryReceipt.qrImageUrl}" alt="Parking QR code" /></div>
+    <div class="session">SESSION: ${escapeHtml(entryReceipt.sessionCode)}</div>
+    <div class="rule"></div>
+    <div class="center-label">PARK VEHICLE AT</div>
+    <div class="floor">${escapeHtml(parkingAt)}</div>
+    <div class="floor-name">${escapeHtml(entryReceipt.qrPayload.floorName)}</div>
+    <div class="project-name">${escapeHtml(projectName)}</div>
+    <div class="rule"></div>
+    <div class="field">
+      <div class="label">VEHICLE</div>
+      <div class="value">${escapeHtml(entryReceipt.vehicleType)}</div>
+      <div class="muted">${escapeHtml(entryReceipt.vehicleNumber || "No vehicle number recorded")}</div>
+    </div>
+    <div class="field">
+      <div class="label">DESTINATION</div>
+      <div class="value">${escapeHtml(entryReceipt.qrPayload.companyName)}</div>
+      <div class="muted">Parking: ${escapeHtml(parkingAt)}</div>
+    </div>
+    <div class="field">
+      <div class="label">ENTRY GATE</div>
+      <div class="value">${escapeHtml(entryReceipt.entryGateName || "Entry Gate")}</div>
+    </div>
+    <div class="field">
+      <div class="label">ENTRY TIME</div>
+      <div class="value">${escapeHtml(formatReceiptTime(entryReceipt.entryTime))}</div>
+    </div>
+    <div class="rule"></div>
+    <div class="footer">Scan this QR at exit</div>
+    <div class="thanks">Thank You</div>
+  </main>
+  <script>
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        window.focus();
+        window.print();
+        setTimeout(function () {
+          if (window.frameElement && window.frameElement.parentNode) {
+            window.frameElement.parentNode.removeChild(window.frameElement);
+          }
+        }, 1000);
+      }, 150);
+    });
+  </script>
+</body>
+</html>`;
+
+    printDocument.open();
+    printDocument.write(html);
+    printDocument.close();
+  }, [currentProject?.name, entryReceipt]);
+
   // Desktop Keyboard Shortcuts ([1] 2W, [2] 4W, [3] Others, [Enter] Confirm, [Esc] Reset)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -1728,7 +1912,7 @@ export default function EntryGatePage() {
               </button>
               <button
                 type="button"
-                onClick={() => window.setTimeout(() => window.print(), 100)}
+                onClick={handlePrintReceipt}
                 className="entry-receipt-action flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1565C0] text-sm font-black text-white hover:bg-blue-700"
               >
                 <Printer className="h-4 w-4" />
@@ -1840,7 +2024,7 @@ export default function EntryGatePage() {
               </button>
               <button
                 type="button"
-                onClick={() => window.setTimeout(() => window.print(), 100)}
+                onClick={handlePrintReceipt}
                 className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1565C0] text-sm font-black text-white hover:bg-blue-700"
               >
                 <Printer className="h-4 w-4" />
@@ -1852,6 +2036,29 @@ export default function EntryGatePage() {
       )}
     </div>
   );
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function formatReceiptTime(value: string) {
+  return new Date(value)
+    .toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    })
+    .replace(",", "  ");
 }
 
 function ReceiptRow({
