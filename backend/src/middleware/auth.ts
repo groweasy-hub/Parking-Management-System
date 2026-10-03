@@ -13,13 +13,14 @@ export function authenticate(req: Request, _res: Response, next: NextFunction) {
   const cookieToken = req.cookies?.accessToken;
   const header = req.headers.authorization;
   const headerToken = header?.startsWith("Bearer ") ? header.slice(7) : undefined;
-  const token = cookieToken ?? headerToken;
+  const tokens = [cookieToken, headerToken].filter(Boolean) as string[];
 
-  if (!token) {
+  if (tokens.length === 0) {
     return next(AppError.unauthorized());
   }
 
-  try {
+  for (const token of tokens) {
+    try {
     const payload = verifyAccessToken(token);
     req.user = {
       id: payload.sub,
@@ -27,10 +28,13 @@ export function authenticate(req: Request, _res: Response, next: NextFunction) {
       projectId: payload.projectId,
       gateId: payload.gateId,
     };
-    next();
-  } catch {
-    next(AppError.unauthorized("Session expired. Please log in again.", "TOKEN_INVALID"));
+      return next();
+    } catch {
+      // Try the next available credential before failing the request.
+    }
   }
+
+  next(AppError.unauthorized("Session expired. Please log in again.", "TOKEN_INVALID"));
 }
 
 export function requireRole(...roles: Role[]) {

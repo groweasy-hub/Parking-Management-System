@@ -79,6 +79,7 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
   });
 
   if (res.status === 401 && !skipRefreshRetry && !path.startsWith("/api/auth/refresh") && path !== "/api/auth/login") {
+    setAccessToken(null);
     const refreshed = await tryRefresh();
     if (refreshed) {
       return apiFetch<T>(path, { ...options, skipRefreshRetry: true });
