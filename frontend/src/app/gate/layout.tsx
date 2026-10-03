@@ -6,6 +6,7 @@ import { Protected } from "@/components/auth/protected";
 import { useAuth } from "@/lib/auth-context";
 import { useProject } from "@/lib/project-context";
 import { apiFetch } from "@/lib/api";
+import { deferNavigation } from "@/lib/deferred-navigation";
 import { gatekeeperSecurityPath } from "@/lib/gate-security";
 import { useProjectRealtime } from "@/hooks/useRealtime";
 import { Button } from "@/components/ui/button";
@@ -96,7 +97,7 @@ export default function GateLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user || isSecurity) return;
     const securityPath = gatekeeperSecurityPath(user);
-    if (securityPath) router.replace(securityPath);
+    if (securityPath) return deferNavigation(() => router.replace(securityPath));
   }, [isSecurity, router, user]);
 
   return (

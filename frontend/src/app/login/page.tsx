@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
+import { deferNavigation } from "@/lib/deferred-navigation";
 import { gatekeeperSecurityPath } from "@/lib/gate-security";
 import { landingPathForRole } from "@/lib/roles";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace(gatekeeperSecurityPath(user) ?? landingPathForRole(user.role));
+      return deferNavigation(() => router.replace(gatekeeperSecurityPath(user) ?? landingPathForRole(user.role)));
     }
   }, [user, loading, router]);
 

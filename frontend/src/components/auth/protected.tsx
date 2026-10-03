@@ -3,6 +3,7 @@
 import { ReactNode, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { deferNavigation } from "@/lib/deferred-navigation";
 import { Role } from "@/lib/types";
 import { landingPathForRole } from "@/lib/roles";
 import { Loader2 } from "lucide-react";
@@ -14,11 +15,10 @@ export function Protected({ roles, children }: { roles?: Role[]; children: React
   useEffect(() => {
     if (loading) return;
     if (!user) {
-      router.replace("/login");
-      return;
+      return deferNavigation(() => router.replace("/login"));
     }
     if (roles && !roles.includes(user.role)) {
-      router.replace(landingPathForRole(user.role));
+      return deferNavigation(() => router.replace(landingPathForRole(user.role)));
     }
   }, [loading, user, roles, router]);
 

@@ -6,6 +6,7 @@ import QRCode from "qrcode";
 import { toast } from "sonner";
 import { useProject } from "@/lib/project-context";
 import { apiFetch, ApiError } from "@/lib/api";
+import { deferNavigation } from "@/lib/deferred-navigation";
 import { AllocationAvailability, Company, Floor, Gate, ParkingSessionRecord, VehicleType } from "@/lib/types";
 import { useProjectRealtime } from "@/hooks/useRealtime";
 import {
@@ -147,12 +148,12 @@ export default function EntryGatePage() {
     apiFetch<{ duty: { gateId: { _id: string; type: "ENTRY" | "EXIT" } | string; gateType: "ENTRY" | "EXIT"; endedAt?: string | null } | null }>("/api/gate-duty/today")
       .then((data) => {
         if (!data.duty || data.duty.endedAt || data.duty.gateType !== "ENTRY") {
-          router.replace("/gate/select");
+          deferNavigation(() => router.replace("/gate/select"));
           return;
         }
         setSelectedGateId(typeof data.duty.gateId === "object" ? data.duty.gateId._id : data.duty.gateId);
       })
-      .catch(() => router.replace("/gate/select"));
+      .catch(() => deferNavigation(() => router.replace("/gate/select")));
   }, [router]);
 
   // Load companies
