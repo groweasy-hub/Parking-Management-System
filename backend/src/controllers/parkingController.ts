@@ -170,16 +170,29 @@ export const listActiveSessionsSchema = z.object({
 export const getSessionByQr = asyncHandler(async (req: Request, res: Response) => {
   const { token } = req.query as unknown as z.infer<typeof qrLookupSchema>;
   const payload = verifyParkingQrToken(token);
-  if (!payload) throw AppError.badRequest("Invalid parking QR code.", "INVALID_QR_CODE");
+  const tokenText = token.trim();
+  const sessionCode = /^PS\d+$/i.test(tokenText) ? tokenText.toUpperCase() : null;
 
-  ensureProjectAccess(req.user!, payload.projectId);
+  if (!payload && !sessionCode) {
+    throw AppError.badRequest("Invalid parking QR code.", "INVALID_QR_CODE");
+  }
 
-  const session = await ParkingSession.findOne({
-    _id: payload.sessionId,
-    projectId: payload.projectId,
-    sessionCode: payload.sessionCode,
-    status: "ACTIVE",
-  })
+  if (payload) ensureProjectAccess(req.user!, payload.projectId);
+
+  const session = await ParkingSession.findOne(
+    payload
+      ? {
+          _id: payload.sessionId,
+          projectId: payload.projectId,
+          sessionCode: payload.sessionCode,
+          status: "ACTIVE",
+        }
+      : {
+          projectId: req.user!.projectId,
+          sessionCode,
+          status: "ACTIVE",
+        }
+  )
     .populate("companyId", "name logoUrl")
     .populate("floorId", "name code")
     .populate("entryGateId", "name")

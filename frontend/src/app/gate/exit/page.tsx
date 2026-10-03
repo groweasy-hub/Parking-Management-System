@@ -132,10 +132,8 @@ export default function ExitGatePage() {
 
   // Direct Vehicle Plate / Code Search
   const [plateQuery, setPlateQuery] = useState("");
-  const [qrToken, setQrToken] = useState("");
   const [qrLoading, setQrLoading] = useState(false);
   const [qrScanning, setQrScanning] = useState(false);
-  const [qrScanSupported, setQrScanSupported] = useState(true);
   const [qrSession, setQrSession] = useState<ParkingSessionRecord | null>(null);
   const qrVideoRef = useRef<HTMLVideoElement | null>(null);
   const qrStreamRef = useRef<MediaStream | null>(null);
@@ -214,7 +212,6 @@ export default function ExitGatePage() {
     async (token: string) => {
       const trimmed = token.trim();
       if (!trimmed) {
-        toast.error("Scan or paste a parking QR first.");
         return;
       }
       setQrLoading(true);
@@ -224,7 +221,6 @@ export default function ExitGatePage() {
         );
         setQrSession(data.session);
         setConfirmSession(data.session);
-        setQrToken("");
         stopQrScanner();
         toast.success("QR details loaded.", {
           description: `${data.session.vehicleNumber || data.session.sessionCode} is ready for exit confirmation.`,
@@ -248,13 +244,10 @@ export default function ExitGatePage() {
     ).BarcodeDetector;
 
     if (!BarcodeDetectorCtor || !navigator.mediaDevices?.getUserMedia) {
-      setQrScanSupported(false);
-      toast.error("Camera QR scan is not supported on this browser. Paste the QR token instead.");
       return;
     }
 
     try {
-      setQrScanSupported(true);
       setQrScanning(true);
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" } },
@@ -275,7 +268,6 @@ export default function ExitGatePage() {
           const value = codes[0]?.rawValue;
           if (value) {
             active = false;
-            setQrToken(value);
             await fetchQrSession(value);
             return;
           }
@@ -287,7 +279,7 @@ export default function ExitGatePage() {
       scan();
     } catch {
       setQrScanning(false);
-      toast.error("Unable to start camera. Paste the QR token instead.");
+      toast.error("Unable to start camera.");
     }
   }, [fetchQrSession]);
 
@@ -508,23 +500,13 @@ export default function ExitGatePage() {
           <div className="flex gap-2">
             <Button
               type="button"
-              variant="outline"
               size="sm"
               onClick={qrScanning ? stopQrScanner : startQrScanner}
-              className="gate-press h-10 rounded-xl border-2 border-slate-200 bg-white font-bold gap-2 text-slate-700 hover:bg-slate-50"
-            >
-              <Camera className="h-4 w-4" />
-              {qrScanning ? "Stop Scan" : "Scan QR"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => fetchQrSession(qrToken)}
               disabled={qrLoading}
               className="gate-press h-10 rounded-xl bg-[#1565C0] font-bold gap-2 text-white hover:bg-blue-700"
             >
-              {qrLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-              Fetch Details
+              {qrLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+              {qrScanning ? "Stop Scan" : "Scan QR"}
             </Button>
           </div>
         </div>
@@ -534,19 +516,6 @@ export default function ExitGatePage() {
             <video ref={qrVideoRef} className="h-56 w-full object-cover" muted playsInline />
           </div>
         )}
-
-        {!qrScanSupported && (
-          <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
-            Camera scanning is unavailable in this browser. Paste the QR token below.
-          </p>
-        )}
-
-        <Input
-          value={qrToken}
-          onChange={(e) => setQrToken(e.target.value)}
-          placeholder="Paste parking QR token here if camera scan is not available"
-          className="h-11 rounded-xl border-slate-200 bg-slate-50 font-mono text-xs focus-visible:border-[#1565C0] focus-visible:ring-[#1565C0]"
-        />
 
         {qrSession && (
           <div className="rounded-2xl border-2 border-emerald-200 bg-[#E8F5E9] p-3.5">
