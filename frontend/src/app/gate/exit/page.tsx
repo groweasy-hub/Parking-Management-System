@@ -128,6 +128,7 @@ export default function ExitGatePage() {
   const [qrLoading, setQrLoading] = useState(false);
   const [qrScanning, setQrScanning] = useState(false);
   const [qrScanSupported, setQrScanSupported] = useState(true);
+  const [qrSession, setQrSession] = useState<ParkingSessionRecord | null>(null);
   const qrVideoRef = useRef<HTMLVideoElement | null>(null);
   const qrStreamRef = useRef<MediaStream | null>(null);
 
@@ -213,9 +214,13 @@ export default function ExitGatePage() {
         const data = await apiFetch<{ session: ParkingSessionRecord }>(
           `/api/parking/qr?token=${encodeURIComponent(trimmed)}`
         );
+        setQrSession(data.session);
         setConfirmSession(data.session);
         setQrToken("");
         stopQrScanner();
+        toast.success("QR details loaded.", {
+          description: `${data.session.vehicleNumber || data.session.sessionCode} is ready for exit confirmation.`,
+        });
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : "Unable to read this parking QR.");
       } finally {
@@ -401,6 +406,7 @@ export default function ExitGatePage() {
       });
 
       setSessions((prev) => prev.filter((s) => s._id !== confirmSession._id));
+      setQrSession((current) => (current?._id === confirmSession._id ? null : current));
       setConfirmSession(null);
 
       // Return to main screen ready for next vehicle
@@ -533,6 +539,53 @@ export default function ExitGatePage() {
           placeholder="Paste parking QR token here if camera scan is not available"
           className="h-11 rounded-xl font-mono text-xs"
         />
+
+        {qrSession && (
+          <div className="rounded-2xl border-2 border-emerald-500/30 bg-emerald-500/10 p-3.5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                  QR Details Found
+                </p>
+                <p className="font-mono text-lg font-black tracking-wide text-foreground">
+                  {qrSession.vehicleNumber || qrSession.sessionCode}
+                </p>
+              </div>
+              <Badge className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-black text-white hover:bg-emerald-600">
+                ACTIVE
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+              <div className="rounded-xl bg-background/80 p-2.5">
+                <p className="font-bold uppercase tracking-wider text-muted-foreground">Company</p>
+                <p className="mt-1 font-black text-foreground">{fieldName(qrSession.companyId) || "-"}</p>
+              </div>
+              <div className="rounded-xl bg-background/80 p-2.5">
+                <p className="font-bold uppercase tracking-wider text-muted-foreground">Floor</p>
+                <p className="mt-1 font-black text-foreground">{fieldName(qrSession.floorId) || "-"}</p>
+              </div>
+              <div className="rounded-xl bg-background/80 p-2.5">
+                <p className="font-bold uppercase tracking-wider text-muted-foreground">Vehicle</p>
+                <p className="mt-1 font-black text-foreground">{qrSession.vehicleType}</p>
+              </div>
+              <div className="rounded-xl bg-background/80 p-2.5">
+                <p className="font-bold uppercase tracking-wider text-muted-foreground">Entry</p>
+                <p className="mt-1 font-black text-foreground">
+                  {new Date(qrSession.entryTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </p>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              onClick={() => setConfirmSession(qrSession)}
+              className="mt-3 h-11 w-full rounded-xl bg-emerald-600 font-black text-white hover:bg-emerald-700"
+            >
+              Confirm Exit for This Vehicle
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* 2-Column Responsive Layout on Desktop */}
