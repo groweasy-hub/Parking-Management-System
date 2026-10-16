@@ -55,6 +55,7 @@ export const env = {
   },
   notifications: {
     passwordResetWebhookUrl: process.env.PASSWORD_RESET_WEBHOOK_URL ?? "",
+    frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:3000",
   },
   seed: {
     superAdminEmail: process.env.SEED_SUPER_ADMIN_EMAIL ?? "admin@parking.local",

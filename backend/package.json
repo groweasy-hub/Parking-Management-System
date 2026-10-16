@@ -15,7 +15,8 @@
     "reconcile": "tsx src/scripts/reconcileOccupancy.ts",
     "typecheck": "tsc --noEmit",
     "smoke-test": "tsx src/scripts/smokeTest.ts",
-    "smoke-test:http": "tsx src/scripts/httpSmokeTest.ts"
+    "smoke-test:http": "tsx src/scripts/httpSmokeTest.ts",
+    "smoke-test:password-reset": "tsx src/scripts/passwordResetSmokeTest.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -90,6 +90,30 @@ npm run build && npm start   # production build
 This is the fastest way to confirm the concurrency guarantees hold on your machine without
 provisioning Atlas first.
 
+### Password reset emails
+
+The login page links to **Forgot password?**. Users enter their registered email,
+receive a reset link, then enter and confirm a new password. Unknown or inactive
+accounts display an email error. Links expire after 15 minutes and work once;
+requesting a new link invalidates the previous one. Only a hash of the token is
+stored in MongoDB.
+
+Set these values in `backend/.env` (and your backend hosting environment):
+
+```dotenv
+FRONTEND_URL=http://localhost:3000
+PASSWORD_RESET_WEBHOOK_URL=https://your-email-service.example/password-reset
+```
+
+`FRONTEND_URL` must be your actual frontend address in production. The webhook
+receives a JSON POST with `{ "email": "recipient@example.com", "resetLink": "..." }`
+and must send that link to the recipient using your email provider. It must return
+a successful HTTP status after accepting the email. The reset token is in the URL
+fragment; preserve the full link in the email. The application shows a delivery
+error if the webhook is missing, fails, or times out; it does not claim an email
+was sent. Run `npm run smoke-test:password-reset` in `backend/` to test the flow
+with a local fake email service and a temporary database.
+
 ## Frontend setup
 
 ```bash

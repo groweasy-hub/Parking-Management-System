@@ -1,11 +1,14 @@
 import { Router } from "express";
-import { changePassword, login, logout, refresh, me, updateProfile } from "../controllers/authController";
-import { changePasswordSchema, loginSchema, updateProfileSchema } from "../controllers/authController";
+import { changePassword, login, logout, refresh, me, updateProfile, forgotPassword, resetPassword } from "../controllers/authController";
+import { changePasswordSchema, loginSchema, updateProfileSchema, forgotPasswordSchema, resetPasswordSchema } from "../controllers/authController";
 import { validate } from "../middleware/validate";
 import { authenticate, requireRole } from "../middleware/auth";
-import { loginLimiter } from "../middleware/rateLimiters";
+import { loginLimiter, passwordResetLimiter } from "../middleware/rateLimiters";
 
 const router = Router();
+
+router.post("/forgot-password", passwordResetLimiter, validate(forgotPasswordSchema), forgotPassword);
+router.post("/reset-password", passwordResetLimiter, validate(resetPasswordSchema), resetPassword);
 
 router.post(
   "/login",

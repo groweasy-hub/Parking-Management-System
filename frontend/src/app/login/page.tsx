@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
 import { deferNavigation } from "@/lib/deferred-navigation";
@@ -169,6 +170,11 @@ export default function LoginPage() {
                 "Sign In to Terminal"
               )}
             </Button>
+            <div className="text-center">
+              <Link href="/forgot-password" className="text-sm font-semibold text-primary hover:underline">
+                Forgot password?
+              </Link>
+            </div>
           </form>
         </div>
       </div>

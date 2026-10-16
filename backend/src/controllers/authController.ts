@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
@@ -7,6 +8,7 @@ import { hashPassword } from "../utils/password";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
 import { env, isProduction } from "../config/env";
 import { recordAudit } from "../services/auditService";
+import { sendPasswordResetEmail } from "../services/emailService";
 import { sanitizeEmail, sanitizeHumanName, sanitizePassword, sanitizePhone } from "../utils/sanitize";
 import {
   applyProgressiveDelay,
@@ -40,6 +42,70 @@ export const changePasswordSchema = z.object({
     (value) => (typeof value === "string" ? sanitizePassword(value) : value),
     z.string().min(8).max(128)
   ),
+});
+
+export const forgotPasswordSchema = loginSchema.pick({ email: true });
+
+export const resetPasswordSchema = z.object({
+  token: z.string().regex(/^[a-f0-9]{64}$/, "This reset link is invalid. Please request a new one."),
+  newPassword: changePasswordSchema.shape.newPassword,
+});
+
+export const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
+  const { email } = req.body as z.infer<typeof forgotPasswordSchema>;
+  const user = await User.findOne({ email, status: "ACTIVE" });
+  if (!user) {
+    throw AppError.notFound("No active account was found with this email. Please check your email address.", "EMAIL_NOT_FOUND");
+  }
+
+  const token = randomBytes(32).toString("hex");
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  // Always use the configured frontend address, never a caller-provided host.
+  const resetLink = new URL("/reset-password", env.notifications.frontendUrl);
+  resetLink.hash = new URLSearchParams({ token }).toString();
+  await User.updateOne({ _id: user._id }, { $set: {
+    passwordResetTokenHash: tokenHash,
+    passwordResetExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
+  } });
+
+  try {
+    await sendPasswordResetEmail(user.email, resetLink.toString());
+  } catch (error) {
+    await User.updateOne({ _id: user._id, passwordResetTokenHash: tokenHash }, {
+      $unset: { passwordResetTokenHash: 1, passwordResetExpiresAt: 1 },
+    });
+    throw error;
+  }
+  res.json({ message: "A password reset link has been sent to your email. It expires in 15 minutes." });
+});
+
+export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
+  const { token, newPassword } = req.body as z.infer<typeof resetPasswordSchema>;
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const passwordHash = await hashPassword(newPassword);
+  // Consume the token and update the password atomically to prevent link reuse.
+  const user = await User.findOneAndUpdate({
+    passwordResetTokenHash: tokenHash,
+    passwordResetExpiresAt: { $gt: new Date() },
+    status: "ACTIVE",
+  }, {
+    $set: { passwordHash, mustChangePassword: false },
+    $unset: { passwordResetTokenHash: 1, passwordResetExpiresAt: 1 },
+  }, { new: true });
+  if (!user) {
+    throw AppError.badRequest("This reset link is invalid or expired. Please request a new one.", "INVALID_RESET_TOKEN");
+  }
+  clearFailedLogin(user.email);
+  res.clearCookie("accessToken", { domain: ACCESS_COOKIE_OPTIONS.domain });
+  res.clearCookie("refreshToken", { domain: ACCESS_COOKIE_OPTIONS.domain, path: "/api/auth" });
+  await recordAudit({
+    userId: String(user._id),
+    projectId: user.projectId ? String(user.projectId) : null,
+    action: "PASSWORD_RESET",
+    entityType: "User",
+    entityId: user._id as never,
+  });
+  res.json({ message: "Your password has been reset. You can now sign in with your new password." });
 });
 
 export const updateProfileSchema = z
@@ -234,6 +300,8 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
 
   user.passwordHash = await hashPassword(newPassword);
   user.mustChangePassword = false;
+  user.passwordResetTokenHash = undefined;
+  user.passwordResetExpiresAt = undefined;
   await user.save();
 
   await recordAudit({
@@ -274,6 +342,8 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
     }
     user.passwordHash = await hashPassword(data.newPassword);
     user.mustChangePassword = false;
+    user.passwordResetTokenHash = undefined;
+    user.passwordResetExpiresAt = undefined;
   }
 
   user.name = data.name;

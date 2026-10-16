@@ -6,6 +6,8 @@ export interface IUser extends Document {
   email: string;
   phone?: string;
   passwordHash: string;
+  passwordResetTokenHash?: string;
+  passwordResetExpiresAt?: Date;
   role: Role;
   customRoleLabel?: string;
   mustChangePassword: boolean;
@@ -23,6 +25,8 @@ const userSchema = new Schema<IUser>(
     email: { type: String, required: true, trim: true, lowercase: true, unique: true },
     phone: { type: String, trim: true },
     passwordHash: { type: String, required: true, select: false },
+    passwordResetTokenHash: { type: String, select: false },
+    passwordResetExpiresAt: { type: Date, select: false },
     role: { type: String, enum: ROLES, required: true },
     customRoleLabel: { type: String, trim: true },
     mustChangePassword: { type: Boolean, default: false },
