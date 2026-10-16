@@ -11,10 +11,12 @@ import {
   Occupancy,
   Gate,
   User,
+  GateDuty,
 } from "../models";
 import { recordAudit } from "../services/auditService";
 import { generateUniqueCode } from "../utils/codeGenerator";
 import { runInTransaction } from "../utils/transaction";
+import { ensureProjectAccess } from "../middleware/auth";
 
 export const createProjectSchema = z.object({
   name: z.string().min(2),
@@ -41,6 +43,7 @@ export const listProjects = asyncHandler(async (req: Request, res: Response) => 
 });
 
 export const getProject = asyncHandler(async (req: Request, res: Response) => {
+  ensureProjectAccess(req.user!, String(req.params.id));
   const project = await Project.findById(req.params.id).lean();
   if (!project) throw AppError.notFound("Project not found.");
   res.json({ project });
@@ -113,15 +116,14 @@ export const deleteProject = asyncHandler(async (req: Request, res: Response) =>
       session
     );
 
-    await Promise.all([
-      Occupancy.deleteMany({ projectId }, { session }),
-      ParkingSession.deleteMany({ projectId }, { session }),
-      ParkingAllocation.deleteMany({ projectId }, { session }),
-      Floor.deleteMany({ projectId }, { session }),
-      Company.deleteMany({ projectId }, { session }),
-      Gate.deleteMany({ projectId }, { session }),
-      User.deleteMany({ projectId }, { session }),
-    ]);
+    await Occupancy.deleteMany({ projectId }, { session });
+    await ParkingSession.deleteMany({ projectId }, { session });
+    await ParkingAllocation.deleteMany({ projectId }, { session });
+    await Floor.deleteMany({ projectId }, { session });
+    await Company.deleteMany({ projectId }, { session });
+    await GateDuty.deleteMany({ projectId }, { session });
+    await Gate.deleteMany({ projectId }, { session });
+    await User.deleteMany({ projectId }, { session });
 
     await Project.deleteOne({ _id: projectId }, { session });
   });

@@ -20,10 +20,10 @@ async function upsertProject() {
   );
 }
 
-async function upsertFloor(projectId: mongoose.Types.ObjectId, name: string, code: string, displayOrder: number) {
+async function upsertFloor(projectId: mongoose.Types.ObjectId, name: string, code: string, displayOrder: number, carCapacity = 0, bikeCapacity = 0) {
   return Floor.findOneAndUpdate(
     { projectId, code },
-    { $setOnInsert: { projectId, name, code, displayOrder, status: "ACTIVE" } },
+    { $setOnInsert: { projectId, name, code, displayOrder, carCapacity, bikeCapacity, status: "ACTIVE" } },
     { upsert: true, new: true }
   );
 }
@@ -81,6 +81,7 @@ async function upsertUser(params: {
     email: params.email,
     passwordHash,
     role: params.role,
+    mustChangePassword: params.role === "GATEKEEPER",
     projectId: params.projectId ?? null,
     gateId: params.gateId ?? null,
     status: "ACTIVE",
@@ -103,9 +104,9 @@ async function main() {
   console.log(`[seed] Project ready: ${project.name} (${project.code})`);
 
   const [b1, b2, b3] = await Promise.all([
-    upsertFloor(project._id as mongoose.Types.ObjectId, "Basement 1", "B1", 1),
-    upsertFloor(project._id as mongoose.Types.ObjectId, "Basement 2", "B2", 2),
-    upsertFloor(project._id as mongoose.Types.ObjectId, "Basement 3", "B3", 3),
+    upsertFloor(project._id as mongoose.Types.ObjectId, "Basement 1", "B1", 1, 35, 50),
+    upsertFloor(project._id as mongoose.Types.ObjectId, "Basement 2", "B2", 2, 35, 30),
+    upsertFloor(project._id as mongoose.Types.ObjectId, "Basement 3", "B3", 3, 5, 0),
   ]);
 
   const [abc, xyz, pqr] = await Promise.all([

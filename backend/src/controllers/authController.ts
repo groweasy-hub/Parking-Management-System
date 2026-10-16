@@ -9,6 +9,7 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/
 import { env, isProduction } from "../config/env";
 import { recordAudit } from "../services/auditService";
 import { sendPasswordResetEmail } from "../services/emailService";
+import { disconnectUserSessions } from "../realtime/socketServer";
 import { sanitizeEmail, sanitizeHumanName, sanitizePassword, sanitizePhone } from "../utils/sanitize";
 import {
   applyProgressiveDelay,
@@ -90,12 +91,14 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
     status: "ACTIVE",
   }, {
     $set: { passwordHash, mustChangePassword: false },
+    $inc: { sessionVersion: 1 },
     $unset: { passwordResetTokenHash: 1, passwordResetExpiresAt: 1 },
   }, { new: true });
   if (!user) {
     throw AppError.badRequest("This reset link is invalid or expired. Please request a new one.", "INVALID_RESET_TOKEN");
   }
   clearFailedLogin(user.email);
+  disconnectUserSessions(String(user._id));
   res.clearCookie("accessToken", { domain: ACCESS_COOKIE_OPTIONS.domain });
   res.clearCookie("refreshToken", { domain: ACCESS_COOKIE_OPTIONS.domain, path: "/api/auth" });
   await recordAudit({
@@ -163,14 +166,16 @@ function buildTokens(user: {
   role: string;
   projectId?: unknown;
   gateId?: unknown;
+  sessionVersion?: number;
 }) {
   const accessToken = signAccessToken({
     sub: String(user._id),
     role: user.role as never,
     projectId: user.projectId ? String(user.projectId) : null,
     gateId: user.gateId ? String(user.gateId) : null,
+    sessionVersion: user.sessionVersion ?? 0,
   });
-  const refreshToken = signRefreshToken(String(user._id));
+  const refreshToken = signRefreshToken(String(user._id), user.sessionVersion ?? 0);
   return { accessToken, refreshToken };
 }
 
@@ -261,7 +266,7 @@ export const refresh = asyncHandler(async (req: Request, res: Response) => {
   const token = req.cookies?.refreshToken;
   if (!token) throw AppError.unauthorized();
 
-  let payload: { sub: string };
+  let payload: { sub: string; sessionVersion?: number };
   try {
     payload = verifyRefreshToken(token);
   } catch {
@@ -269,7 +274,7 @@ export const refresh = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const user = await User.findById(payload.sub);
-  if (!user || user.status !== "ACTIVE") throw AppError.unauthorized();
+  if (!user || user.status !== "ACTIVE" || (user.sessionVersion ?? 0) !== (payload.sessionVersion ?? 0)) throw AppError.unauthorized();
 
   const { accessToken, refreshToken } = buildTokens(user);
   res.cookie("accessToken", accessToken, ACCESS_COOKIE_OPTIONS);
@@ -290,7 +295,7 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
   if (!req.user) throw AppError.unauthorized();
   const { oldPassword, newPassword } = req.body as z.infer<typeof changePasswordSchema>;
 
-  const user = await User.findById(req.user.id).select("+passwordHash");
+  const user = await User.findById(req.user.id).select("+passwordHash +passwordResetTokenHash +passwordResetExpiresAt");
   if (!user || user.status !== "ACTIVE") throw AppError.unauthorized();
 
   const { valid } = await verifyPasswordAndGetMigrationHash(oldPassword, user.passwordHash);
@@ -299,10 +304,15 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
   }
 
   user.passwordHash = await hashPassword(newPassword);
+  user.sessionVersion = (user.sessionVersion ?? 0) + 1;
   user.mustChangePassword = false;
   user.passwordResetTokenHash = undefined;
   user.passwordResetExpiresAt = undefined;
   await user.save();
+  disconnectUserSessions(String(user._id));
+  const tokens = buildTokens(user);
+  res.cookie("accessToken", tokens.accessToken, ACCESS_COOKIE_OPTIONS);
+  res.cookie("refreshToken", tokens.refreshToken, REFRESH_COOKIE_OPTIONS);
 
   await recordAudit({
     userId: String(user._id),
@@ -313,6 +323,7 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
   });
 
   res.json({
+    accessToken: tokens.accessToken,
     user: serializeAuthUser(user),
   });
 });
@@ -323,7 +334,7 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
   const data = req.body as z.infer<typeof updateProfileSchema>;
   const normalizedEmail = data.email.toLowerCase();
 
-  const user = await User.findById(req.user.id).select("+passwordHash");
+  const user = await User.findById(req.user.id).select("+passwordHash +passwordResetTokenHash +passwordResetExpiresAt");
   if (!user || user.status !== "ACTIVE" || user.role !== "SUPER_ADMIN") {
     throw AppError.badRequest(GENERIC_PROFILE_UPDATE_ERROR, "PROFILE_UPDATE_FAILED");
   }
@@ -333,6 +344,8 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
     if (existing) {
       throw AppError.badRequest(GENERIC_PROFILE_UPDATE_ERROR, "PROFILE_UPDATE_FAILED");
     }
+    user.passwordResetTokenHash = undefined;
+    user.passwordResetExpiresAt = undefined;
   }
 
   if (data.newPassword) {
@@ -341,6 +354,7 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
       throw AppError.badRequest(GENERIC_PROFILE_UPDATE_ERROR, "PROFILE_UPDATE_FAILED");
     }
     user.passwordHash = await hashPassword(data.newPassword);
+    user.sessionVersion = (user.sessionVersion ?? 0) + 1;
     user.mustChangePassword = false;
     user.passwordResetTokenHash = undefined;
     user.passwordResetExpiresAt = undefined;
@@ -350,6 +364,13 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
   user.email = normalizedEmail;
   user.phone = data.phone || undefined;
   await user.save();
+
+  const tokens = data.newPassword ? buildTokens(user) : null;
+  if (tokens) {
+    disconnectUserSessions(String(user._id));
+    res.cookie("accessToken", tokens.accessToken, ACCESS_COOKIE_OPTIONS);
+    res.cookie("refreshToken", tokens.refreshToken, REFRESH_COOKIE_OPTIONS);
+  }
 
   await recordAudit({
     userId: String(user._id),
@@ -364,5 +385,5 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
     },
   });
 
-  res.json({ user: serializeAuthUser(user) });
+  res.json({ user: serializeAuthUser(user), ...(tokens ? { accessToken: tokens.accessToken } : {}) });
 });

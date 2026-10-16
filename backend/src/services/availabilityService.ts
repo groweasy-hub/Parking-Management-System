@@ -58,8 +58,9 @@ export async function getCompanyAvailability(
   if (allocations.length === 0) return [];
 
   const floorIds = allocations.map((a) => a.floorId);
-  const floors = await Floor.find({ _id: { $in: floorIds } }).lean();
+  const floors = await Floor.find({ _id: { $in: floorIds }, status: "ACTIVE" }).lean();
   const floorMap = new Map(floors.map((f) => [String(f._id), f]));
+  allocations = allocations.filter((allocation) => floorMap.has(String(allocation.floorId)));
 
   const occupancies = await Occupancy.find({
     allocationId: { $in: allocations.map((a) => a._id) },

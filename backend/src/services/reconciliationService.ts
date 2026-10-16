@@ -31,27 +31,30 @@ export async function reconcileOccupancy(
   const results: ReconciliationResult[] = [];
 
   for (const allocation of allocations) {
-    const actualOccupied = await ParkingSession.countDocuments({
-      allocationId: allocation._id,
-      status: "ACTIVE",
-    });
-
-    const occ = await Occupancy.findOne({ allocationId: allocation._id }).lean();
-    const previousOccupied = occ?.occupied ?? 0;
-    const corrected = previousOccupied !== actualOccupied || !occ || occ.capacity !== allocation.capacity;
-
-    if (corrected) {
-      await runInTransaction(async (session) => {
-        await Occupancy.findOneAndUpdate(
+    const result = await runInTransaction(async (session) => {
+      const current = await ParkingAllocation.findById(allocation._id).session(session).lean();
+      if (!current) return null;
+      // Lock the same counter used by entry/exit before counting sessions. A
+      // concurrent parking operation forces a retry instead of being overwritten.
+      const occ = await Occupancy.findOneAndUpdate(
+        { allocationId: allocation._id },
+        { $set: { projectId: current.projectId, capacity: current.capacity }, $setOnInsert: { occupied: 0 } },
+        { upsert: true, session, new: false }
+      ).lean();
+      const actualOccupied = await ParkingSession.countDocuments({ allocationId: allocation._id, status: "ACTIVE" }).session(session);
+      const previousOccupied = occ?.occupied ?? 0;
+      const corrected = previousOccupied !== actualOccupied || !occ || occ.capacity !== current.capacity;
+      if (corrected) {
+        await Occupancy.updateOne(
           { allocationId: allocation._id },
           {
             $set: {
-              projectId: allocation.projectId,
-              capacity: allocation.capacity,
+              projectId: current.projectId,
+              capacity: current.capacity,
               occupied: actualOccupied,
             },
           },
-          { upsert: true, session }
+          { session }
         );
         await recordAudit(
           {
@@ -60,21 +63,20 @@ export async function reconcileOccupancy(
             action: "OCCUPANCY_RECONCILED",
             entityType: "ParkingAllocation",
             entityId: allocation._id,
-            metadata: { previousOccupied, actualOccupied, capacity: allocation.capacity },
+            metadata: { previousOccupied, actualOccupied, capacity: current.capacity },
           },
           session
         );
-      });
-    }
-
+      }
+      return { previousOccupied, actualOccupied, corrected };
+    });
+    if (!result) continue;
     results.push({
       allocationId: String(allocation._id),
       companyName: companyMap.get(String(allocation.companyId)) ?? "Unknown company",
       floorName: floorMap.get(String(allocation.floorId)) ?? "Unknown floor",
       vehicleType: allocation.vehicleType,
-      previousOccupied,
-      actualOccupied,
-      corrected,
+      ...result,
     });
   }
 

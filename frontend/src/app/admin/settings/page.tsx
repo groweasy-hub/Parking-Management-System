@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useProject } from "@/lib/project-context";
 import { useAuth } from "@/lib/auth-context";
 import { AuthUser } from "@/lib/types";
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, ApiError, setAccessToken } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,10 +98,11 @@ export default function SettingsPage() {
         currentPassword: values.currentPassword || undefined,
         newPassword: values.newPassword || undefined,
       };
-      const data = await apiFetch<{ user: AuthUser }>("/api/auth/profile", {
+      const data = await apiFetch<{ user: AuthUser; accessToken?: string }>("/api/auth/profile", {
         method: "PATCH",
         body: JSON.stringify(payload),
       });
+      if (data.accessToken) setAccessToken(data.accessToken);
       profileForm.reset({
         name: data.user.name,
         email: data.user.email,

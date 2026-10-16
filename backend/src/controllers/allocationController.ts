@@ -1,8 +1,9 @@
 import { Request, Response } from "express";
 import { z } from "zod";
+import { ClientSession } from "mongoose";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
-import { Floor, ParkingAllocation, Occupancy, ParkingSession } from "../models";
+import { Company, Floor, ParkingAllocation, Occupancy, ParkingSession } from "../models";
 import { ensureProjectAccess } from "../middleware/auth";
 import { recordAudit } from "../services/auditService";
 import { runInTransaction } from "../utils/transaction";
@@ -35,8 +36,13 @@ async function ensureFloorCapacityAvailable(args: {
   vehicleType: string;
   requestedCapacity: number;
   excludeAllocationId?: string;
+  session: ClientSession;
 }) {
-  const floor = await Floor.findOne({ _id: args.floorId, projectId: args.projectId }).lean();
+  // Serialize allocation changes against the same floor, including simultaneous requests.
+  const floor = await Floor.findOneAndUpdate(
+    { _id: args.floorId, projectId: args.projectId, status: "ACTIVE" },
+    { $inc: { allocationRevision: 1 } }, { session: args.session, new: true }
+  ).lean();
   if (!floor) throw AppError.notFound("Parking floor not found.");
 
   const capacityField = capacityFieldFor(args.vehicleType) as "carCapacity" | "bikeCapacity";
@@ -49,7 +55,7 @@ async function ensureFloorCapacityAvailable(args: {
   };
   if (args.excludeAllocationId) filter._id = { $ne: args.excludeAllocationId };
 
-  const existingAllocations = await ParkingAllocation.find(filter).lean();
+  const existingAllocations = await ParkingAllocation.find(filter).session(args.session).lean();
   const alreadyAllocated = existingAllocations.reduce((sum, allocation) => sum + allocation.capacity, 0);
   if (alreadyAllocated + args.requestedCapacity > floorCapacity) {
     throw AppError.badRequest(
@@ -100,14 +106,14 @@ export const createAllocation = asyncHandler(async (req: Request, res: Response)
     );
   }
 
-  await ensureFloorCapacityAvailable({
-    projectId: data.projectId,
-    floorId: data.floorId,
-    vehicleType: data.vehicleType,
-    requestedCapacity: data.capacity,
-  });
-
   const allocation = await runInTransaction(async (session) => {
+    if (!await Company.exists({ _id: data.companyId, projectId: data.projectId, status: "ACTIVE" }).session(session)) {
+      throw AppError.badRequest("Please select an active company in this project.");
+    }
+    await ensureFloorCapacityAvailable({
+      projectId: data.projectId, floorId: data.floorId, vehicleType: data.vehicleType,
+      requestedCapacity: data.capacity, session,
+    });
     const [created] = await ParkingAllocation.create(
       [
         {
@@ -160,37 +166,25 @@ export const updateAllocation = asyncHandler(async (req: Request, res: Response)
 
   const data = req.body as z.infer<typeof updateAllocationSchema>;
 
-  if (data.capacity !== undefined) {
-    const activeCount = await ParkingSession.countDocuments({
-      allocationId: existing._id,
-      status: "ACTIVE",
-    });
-    if (data.capacity < activeCount) {
-      throw AppError.badRequest(
-        `Capacity cannot be set below the current occupancy (${activeCount}).`,
-        "CAPACITY_BELOW_OCCUPANCY"
-      );
-    }
+  const allocation = await runInTransaction(async (session) => {
+    const current = await ParkingAllocation.findById(existing._id).session(session);
+    if (!current) throw AppError.notFound("Allocation not found.");
+    const nextCapacity = data.capacity ?? current.capacity;
+    const nextStatus = data.status ?? current.status;
     await ensureFloorCapacityAvailable({
-      projectId: String(existing.projectId),
-      floorId: String(existing.floorId),
-      vehicleType: existing.vehicleType,
-      requestedCapacity: data.capacity,
-      excludeAllocationId: String(existing._id),
+      projectId: String(current.projectId), floorId: String(current.floorId),
+      vehicleType: current.vehicleType, requestedCapacity: nextStatus === "ACTIVE" ? nextCapacity : 0,
+      excludeAllocationId: String(current._id), session,
     });
-  }
-
-  await runInTransaction(async (session) => {
-    Object.assign(existing, data);
-    await existing.save({ session });
-
-    if (data.capacity !== undefined) {
-      await Occupancy.findOneAndUpdate(
-        { allocationId: existing._id },
-        { $set: { capacity: data.capacity } },
-        { session }
-      );
+    const activeCount = await ParkingSession.countDocuments({ allocationId: current._id, status: "ACTIVE" }).session(session);
+    if (nextCapacity < activeCount || (nextStatus === "INACTIVE" && activeCount > 0)) {
+      throw AppError.badRequest("This allocation still has parked vehicles. Keep enough capacity until they exit.", "CAPACITY_BELOW_OCCUPANCY");
     }
+    // Writing the occupancy document also conflicts with concurrent entries/exits,
+    // so a transaction retry rechecks the latest number of parked vehicles.
+    await Occupancy.updateOne({ allocationId: current._id }, { $set: { capacity: nextCapacity } }, { session });
+    Object.assign(current, data);
+    await current.save({ session });
 
     await recordAudit(
       {
@@ -198,12 +192,13 @@ export const updateAllocation = asyncHandler(async (req: Request, res: Response)
         projectId: String(existing.projectId),
         action: "ALLOCATION_UPDATED",
         entityType: "ParkingAllocation",
-        entityId: existing._id as never,
+        entityId: current._id as never,
         metadata: data,
       },
       session
     );
+    return current;
   });
 
-  res.json({ allocation: existing });
+  res.json({ allocation });
 });

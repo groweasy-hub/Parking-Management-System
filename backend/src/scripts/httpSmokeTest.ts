@@ -37,7 +37,7 @@ function cookieHeader(jar: Map<string, string>) {
 
 async function main() {
   console.log("Starting single-node MongoDB replica set...");
-  const replSet = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
+  const replSet = await MongoMemoryReplSet.create({ replSet: { count: 1 }, instanceOpts: [{ launchTimeout: 60000 }] });
   process.env.MONGODB_URI = replSet.getUri("parking_http_smoke");
   process.env.JWT_ACCESS_SECRET = "http-smoke-access";
   process.env.JWT_REFRESH_SECRET = "http-smoke-refresh";
@@ -103,6 +103,11 @@ async function main() {
   const loginBody = (await loginRes.json()) as { user: { role: string } };
   check("login returns 200 and correct role", loginRes.status === 200 && loginBody.user.role === "GATEKEEPER");
   check("login sets an accessToken cookie", jar.has("accessToken"));
+  const startEntryDuty = await fetch(`${base}/api/gate-duty/start`, {
+    method: "POST", headers: { "Content-Type": "application/json", Cookie: cookieHeader(jar) },
+    body: JSON.stringify({ projectId: String(project._id), gateId: String(entryGate._id) }),
+  });
+  check("entry gate duty starts before recording entries", startEntryDuty.status === 201);
 
   // --- Unauthenticated request is rejected ---
   const unauthedRes = await fetch(`${base}/api/parking/active?projectId=${project._id}`);
@@ -169,6 +174,11 @@ async function main() {
     body: JSON.stringify({ email: "httpexit@smoke.local", password: "Password123!" }),
   });
   extractCookies(exitLoginRes, exitJar);
+  const startExitDuty = await fetch(`${base}/api/gate-duty/start`, {
+    method: "POST", headers: { "Content-Type": "application/json", Cookie: cookieHeader(exitJar) },
+    body: JSON.stringify({ projectId: String(project._id), gateId: String(exitGate._id) }),
+  });
+  check("exit gate duty starts before recording exits", startExitDuty.status === 201);
 
   const exitRes = await fetch(`${base}/api/parking/exit`, {
     method: "POST",

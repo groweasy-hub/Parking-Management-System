@@ -18,7 +18,7 @@ real-time events flow through the backend's REST API and Socket.IO server.
 
 - **Database**: MongoDB (Mongoose). Every collection that needs it carries a `projectId` for
   strict per-project data isolation.
-- **Auth**: JWT access token (15 min, httpOnly cookie) + refresh token (7 days, httpOnly
+- **Auth**: JWT access token (15 min, httpOnly cookie) + refresh token (configurable, httpOnly
   cookie, scoped to `/api/auth`). Passwords are hashed with bcrypt (12 rounds). Every protected
   route re-verifies identity, role and project access server-side — the client's claimed role
   is never trusted.
@@ -39,7 +39,7 @@ real-time events flow through the backend's REST API and Socket.IO server.
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22.x
 - A MongoDB deployment that is a **replica set** — transactions and the reconciliation logic
   require it. The easiest options:
   - **MongoDB Atlas** (recommended, free tier works and is a replica set by default), or
@@ -60,8 +60,7 @@ npm run seed               # creates demo project, floors, companies, allocation
 npm run dev                 # http://localhost:4000
 ```
 
-`npm run seed` prints the demo login credentials it creates (super admin, project admin, an
-entry gateman, an exit gateman, and a viewer), all scoped to a seeded "Hyderabad Business
+`npm run seed` creates a super admin, a project admin, a gatekeeper, and a viewer, all scoped to a seeded "Hyderabad Business
 Tower" project with the exact floors/companies/allocations from the spec's worked example.
 
 Other useful scripts:
@@ -130,27 +129,31 @@ Sign in with any of the seeded accounts. Role determines the landing page:
 | SUPER_ADMIN     | `/admin/dashboard` (plus a project switcher in the top bar) |
 | PROJECT_ADMIN   | `/admin/dashboard` (scoped to their assigned project) |
 | VIEWER          | `/admin/dashboard` (read-only: no create/edit affordances in the nav) |
-| ENTRY_GATEMAN   | `/gate/entry` — the fast vehicle-type → company → availability → optional plate → Allow Entry flow |
-| EXIT_GATEMAN    | `/gate/exit` — search/filter active sessions and Confirm Exit |
+| GATEKEEPER | `/gate/security` for initial password/device MPIN setup, then `/gate/select` for entry or exit duty |
 
-## Manual test checklist (spec §64)
+## Manual test checklist
 
-With both servers running and seeded data loaded:
+See [HANDOFF_REVIEW.md](HANDOFF_REVIEW.md) for verified checks and remaining acceptance work.
 
-1. Log in as `projectadmin@parking.local` → Floors/Companies/Allocations/Gates/Users pages all
-   scope to the seeded "Hyderabad Business Tower" project.
-2. Log in as `entry@parking.local` (assigned to Gate 1) → run a CAR entry for ABC Technologies
-   with a plate number, then another without one — both should succeed.
-3. Open a second browser window as `viewer@parking.local` on `/admin/dashboard` — occupancy
-   updates there the instant the entry above is confirmed, with no refresh.
-4. Reduce an allocation's capacity to match current occupancy in Allocations, then attempt
-   another entry for it — you get "Parking is no longer available."
-5. Log in as `exit@parking.local` (Gate 3), filter by company/vehicle type, confirm an exit for
-   a vehicle that has no plate number on file (found via company/floor/entry time, not plate).
-6. `npm run smoke-test` covers the two concurrent-request race conditions (§55, §56) that are
-   impractical to trigger reliably by hand.
-7. Settings → "Recalculate Occupancy" reconciles counters from ACTIVE sessions and audits any
-   correction.
+1. Sign in as the project admin and confirm floors, companies, allocations, gates,
+   and users belong to the assigned project.
+2. Sign in as `gatekeeper@parking.local`. Change the temporary password when
+   prompted, set or unlock the device MPIN, then select an entry gate for today.
+3. Record one car entry with a plate and one without a plate. Verify receipts and
+   live occupancy in a separate viewer session.
+4. Check full allocation rejection, duplicate plate rejection, and QR/session-code
+   lookup. Capacity cannot be reduced below current occupancy.
+5. Wind up entry duty, select an exit gate, and complete both exits. Confirm slots
+   become available and attendance counts the successful operations.
+6. Verify reports for today's full business day, history filters, and CSV export.
+7. In Settings, reconcile occupancy. Verify corrections and audit log entries.
+8. Complete a real inbox password reset after configuring the email webhook.
+
+The database connection now fails explicitly if the configured database cannot
+be reached. For disposable local development only, set `ALLOW_IN_MEMORY_DB=true`
+to opt into a temporary in-memory database. Its records do not survive restart.
+Never use that option for client data. The default business timezone is
+`APP_TIMEZONE=Asia/Kolkata`.
 
 ## Deployment
 
@@ -168,7 +171,7 @@ With both servers running and seeded data loaded:
 
 ## What's intentionally out of scope for v1
 
-Per the spec's extensibility section, these are designed for but not built in v1: QR/RFID/ANPR,
+Per the spec's extensibility section, these are designed for but not built in v1: RFID/ANPR,
 visitor/reserved/VIP/EV/employee/guest parking tiers, monthly passes, payments, SMS/WhatsApp
 notifications, a native mobile app, individually numbered slots, and hardware barrier
 integration. The data model (project → floor → company → allocation → session) leaves room for

@@ -27,6 +27,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const load = useCallback(async () => {
     if (!user) {
       setProjects([]);
+      setCurrentProjectIdState(null);
       setLoading(false);
       return;
     }
@@ -42,6 +43,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       } else {
         setCurrentProjectIdState(user.projectId ?? data.projects[0]?._id ?? null);
       }
+    } catch {
+      setProjects([]);
+      setCurrentProjectIdState(null);
     } finally {
       setLoading(false);
     }

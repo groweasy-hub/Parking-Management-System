@@ -63,6 +63,9 @@ async function main() {
       return new URLSearchParams(link.hash.slice(1)).get("token")!;
     };
     const reset = (token: string, newPassword = "Updated123!") => post("reset-password", { token, newPassword });
+    const originalLogin = await post("login", { email: user.email, password: "Original123!" });
+    const originalAuth = await originalLogin.json() as { accessToken: string };
+    const originalRefresh = originalLogin.headers.getSetCookie().find((cookie) => cookie.startsWith("refreshToken="))!.split(";")[0];
 
     assert.equal((await post("forgot-password", { email: "wrong" })).status, 400);
     assert.equal((await post("forgot-password", { email: "missing@example.com" })).status, 404);
@@ -89,6 +92,8 @@ async function main() {
 
     // Isolate the remaining cases from the preceding rate-limit assertion.
     passwordResetLimiter.resetKey("127.0.0.1");
+    assert.equal((await fetch(`${base}/api/auth/me`, { headers: { Authorization: `Bearer ${originalAuth.accessToken}` } })).status, 401);
+    assert.equal((await fetch(`${base}/api/auth/refresh`, { method: "POST", headers: { Cookie: originalRefresh } })).status, 401);
     const changed = await User.findById(user._id).select("+passwordHash +passwordResetTokenHash");
     assert(await comparePassword("Updated123!", changed!.passwordHash));
     assert.equal(changed!.mustChangePassword, false);
@@ -100,6 +105,17 @@ async function main() {
     const expiredToken = latestToken();
     await User.updateOne({ _id: user._id }, { $set: { passwordResetExpiresAt: new Date(Date.now() - 1000) } });
     assert.equal((await reset(expiredToken)).status, 400);
+    assert.equal((await requestLink()).status, 200);
+    const pendingToken = latestToken();
+    const currentLogin = await post("login", { email: user.email, password: "Updated123!" });
+    const currentAuth = await currentLogin.json() as { accessToken: string };
+    const change = await fetch(`${base}/api/auth/change-password`, {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${currentAuth.accessToken}` },
+      body: JSON.stringify({ oldPassword: "Updated123!", newPassword: "ChangedAgain123!" }),
+    });
+    assert.equal(change.status, 200);
+    assert.equal((await reset(pendingToken)).status, 400);
+    console.log("PASS: changing a password invalidates outstanding reset links");
     failDelivery = true;
     assert.equal((await requestLink()).status, 503);
     const afterFailure = await User.findById(user._id).select("+passwordResetTokenHash");

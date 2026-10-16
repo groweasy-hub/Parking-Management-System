@@ -10,13 +10,14 @@ import {
 } from "../controllers/companyController";
 import { authenticate, requireRole } from "../middleware/auth";
 import { validate } from "../middleware/validate";
+import { AppError } from "../utils/AppError";
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
-      return cb(new Error("Only image files are allowed"));
+    if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.mimetype)) {
+      return cb(AppError.badRequest("Please upload a PNG, JPEG, WebP, or GIF image.", "INVALID_UPLOAD"));
     }
     cb(null, true);
   },

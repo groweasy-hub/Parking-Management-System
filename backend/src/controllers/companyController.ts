@@ -7,6 +7,7 @@ import { ensureProjectAccess } from "../middleware/auth";
 import { recordAudit } from "../services/auditService";
 import { deleteCompanyLogo, uploadCompanyLogo } from "../services/storageService";
 import { generateUniqueCode } from "../utils/codeGenerator";
+import { escapeRegex } from "../utils/search";
 
 export const createCompanySchema = z.object({
   projectId: z.string().min(1),
@@ -38,8 +39,8 @@ export const listCompanies = asyncHandler(async (req: Request, res: Response) =>
   const filter: Record<string, unknown> = { projectId };
   if (search) {
     filter.$or = [
-      { name: { $regex: search, $options: "i" } },
-      { code: { $regex: search, $options: "i" } },
+      { name: { $regex: escapeRegex(search), $options: "i" } },
+      { code: { $regex: escapeRegex(search), $options: "i" } },
     ];
   }
 

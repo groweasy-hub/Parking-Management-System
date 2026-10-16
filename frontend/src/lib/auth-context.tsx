@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
-import { apiFetch, ApiError, refreshAccessToken, setAccessToken } from "./api";
+import { apiFetch, ApiError, setAccessToken } from "./api";
 import { disconnectSocket } from "./socket";
 import { AuthUser } from "./types";
 
@@ -31,12 +31,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     try {
-      const refreshed = await refreshAccessToken();
-      if (!refreshed) {
-        clearClientSession();
-        setUser(null);
-        return;
-      }
       const data = await apiFetch<{ user: AuthUser }>("/api/auth/me");
       setUser(data.user);
     } catch (err) {
@@ -54,6 +48,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     refreshUser();
   }, [refreshUser]);
+
+  useEffect(() => {
+    const expire = () => { clearClientSession(); setUser(null); };
+    window.addEventListener("parkflow:session-expired", expire);
+    return () => window.removeEventListener("parkflow:session-expired", expire);
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const data = await apiFetch<{ accessToken?: string; user: AuthUser }>("/api/auth/login", {

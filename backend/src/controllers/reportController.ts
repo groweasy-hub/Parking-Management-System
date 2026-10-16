@@ -1,24 +1,29 @@
 import { Request, Response } from "express";
 import { z } from "zod";
+import { Types } from "mongoose";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
 import { ParkingSession, ParkingAllocation, Occupancy } from "../models";
 import { VEHICLE_TYPES } from "../types/enums";
 import { ensureProjectAccess } from "../middleware/auth";
+import { dateRange, parseDateBoundary } from "../utils/dates";
+import { env } from "../config/env";
+import { escapeRegex } from "../utils/search";
 
 const rangeSchema = z.object({
-  projectId: z.string().min(1),
+  projectId: z.string().regex(/^[a-f0-9]{24}$/i, "Invalid project ID"),
   from: z.string().optional(),
   to: z.string().optional(),
-  companyId: z.string().optional(),
-  floorId: z.string().optional(),
+  companyId: z.string().regex(/^[a-f0-9]{24}$/i).optional(),
+  floorId: z.string().regex(/^[a-f0-9]{24}$/i).optional(),
   vehicleType: z.enum(VEHICLE_TYPES).optional(),
 });
 export { rangeSchema };
 
 function parseRange(query: z.infer<typeof rangeSchema>) {
-  const from = query.from ? new Date(query.from) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const to = query.to ? new Date(query.to) : new Date();
+  const from = query.from ? parseDateBoundary(query.from) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const to = query.to ? parseDateBoundary(query.to, true) : new Date();
+  if (from > to) throw AppError.badRequest("The start date must be before the end date.", "INVALID_DATE_RANGE");
   return { from, to };
 }
 
@@ -27,20 +32,20 @@ export const dailyEntriesExits = asyncHandler(async (req: Request, res: Response
   ensureProjectAccess(req.user!, query.projectId);
   const { from, to } = parseRange(query);
 
-  const baseFilter = { projectId: query.projectId } as Record<string, unknown>;
-  if (query.companyId) baseFilter.companyId = query.companyId;
-  if (query.floorId) baseFilter.floorId = query.floorId;
+  const baseFilter = { projectId: new Types.ObjectId(query.projectId) } as Record<string, unknown>;
+  if (query.companyId) baseFilter.companyId = new Types.ObjectId(query.companyId);
+  if (query.floorId) baseFilter.floorId = new Types.ObjectId(query.floorId);
   if (query.vehicleType) baseFilter.vehicleType = query.vehicleType;
 
   const [entries, exits] = await Promise.all([
     ParkingSession.aggregate([
       { $match: { ...baseFilter, entryTime: { $gte: from, $lte: to } } },
-      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$entryTime" } }, count: { $sum: 1 } } },
+      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$entryTime", timezone: env.timeZone } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]),
     ParkingSession.aggregate([
       { $match: { ...baseFilter, exitTime: { $gte: from, $lte: to } } },
-      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$exitTime" } }, count: { $sum: 1 } } },
+      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$exitTime", timezone: env.timeZone } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]),
   ]);
@@ -139,12 +144,12 @@ export const averageDurationReport = asyncHandler(async (req: Request, res: Resp
   const { from, to } = parseRange(query);
 
   const filter: Record<string, unknown> = {
-    projectId: query.projectId,
+    projectId: new Types.ObjectId(query.projectId),
     status: "COMPLETED",
     exitTime: { $gte: from, $lte: to },
   };
-  if (query.companyId) filter.companyId = query.companyId;
-  if (query.floorId) filter.floorId = query.floorId;
+  if (query.companyId) filter.companyId = new Types.ObjectId(query.companyId);
+  if (query.floorId) filter.floorId = new Types.ObjectId(query.floorId);
   if (query.vehicleType) filter.vehicleType = query.vehicleType;
 
   const [result] = await ParkingSession.aggregate([
@@ -180,8 +185,9 @@ export const activeVehiclesCount = asyncHandler(async (req: Request, res: Respon
 
 function escapeCsv(value: unknown): string {
   if (value === null || value === undefined) return "";
-  const str = String(value);
-  if (/[",\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
+  const raw = String(value);
+  const str = /^[\s]*[=+@-]/.test(raw) ? `'${raw}` : raw;
+  if (/[",\r\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
   return str;
 }
 
@@ -195,6 +201,15 @@ export const exportHistoryCsv = asyncHandler(async (req: Request, res: Response)
   if (req.query.floorId) filter.floorId = req.query.floorId;
   if (req.query.vehicleType) filter.vehicleType = req.query.vehicleType;
   if (req.query.status) filter.status = req.query.status;
+  if (req.query.vehicleNumber) filter.vehicleNumber = { $regex: escapeRegex(String(req.query.vehicleNumber).trim()), $options: "i" };
+  if (req.query.entryGateId) filter.entryGateId = req.query.entryGateId;
+  if (req.query.exitGateId) filter.exitGateId = req.query.exitGateId;
+  if (req.query.entryDateFrom || req.query.entryDateTo) {
+    filter.entryTime = dateRange(req.query.entryDateFrom as string | undefined, req.query.entryDateTo as string | undefined);
+  }
+  if (req.query.exitDateFrom || req.query.exitDateTo) {
+    filter.exitTime = dateRange(req.query.exitDateFrom as string | undefined, req.query.exitDateTo as string | undefined);
+  }
 
   const sessions = await ParkingSession.find(filter)
     .sort({ entryTime: -1 })

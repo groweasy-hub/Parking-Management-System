@@ -1,26 +1,27 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { ProjectProvider } from "@/lib/project-context";
 import { Toaster } from "@/components/ui/sonner";
 
-const jakartaSans = Plus_Jakarta_Sans({
+const jakartaSans = localFont({
+  src: "./fonts/plus-jakarta-sans-latin.woff2",
   variable: "--font-sans",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
+  weight: "300 800",
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "./fonts/geist-mono-latin.woff2",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: "100 900",
+  display: "swap",
 });
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
   themeColor: "#0f172a",
 };

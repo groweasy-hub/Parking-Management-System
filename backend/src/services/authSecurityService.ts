@@ -2,7 +2,6 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { env } from "../config/env";
 import { hashPassword } from "../utils/password";
-import { sendPasswordResetEmail } from "./emailService";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
@@ -12,7 +11,6 @@ const MAX_DELAY_MS = 5000;
 type AttemptState = {
   failedCount: number;
   lockedUntil?: number;
-  notifiedForLockout?: boolean;
 };
 
 const failedAttempts = new Map<string, AttemptState>();
@@ -54,10 +52,6 @@ export async function recordFailedLogin(email: string) {
 
   if (state.failedCount >= MAX_FAILED_ATTEMPTS) {
     state.lockedUntil = now() + LOCKOUT_MS;
-    if (!state.notifiedForLockout) {
-      state.notifiedForLockout = true;
-      await sendPasswordResetEmail(email, buildResetLink(email));
-    }
   }
 
   failedAttempts.set(key, state);
@@ -66,12 +60,6 @@ export async function recordFailedLogin(email: string) {
 
 export function clearFailedLogin(email: string) {
   failedAttempts.delete(authKey(email));
-}
-
-function buildResetLink(email: string) {
-  const origin = env.corsOrigin[0] ?? "http://localhost:3000";
-  const token = crypto.createHash("sha256").update(`${email}:${env.jwt.refreshSecret}`).digest("hex");
-  return `${origin.replace(/\/$/, "")}/reset-password?token=${token}`;
 }
 
 function timingSafeStringEqual(a: string, b: string) {

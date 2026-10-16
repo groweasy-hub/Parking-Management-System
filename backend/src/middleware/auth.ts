@@ -2,6 +2,8 @@ import { NextFunction, Request, Response } from "express";
 import { AppError } from "../utils/AppError";
 import { verifyAccessToken } from "../utils/jwt";
 import { Role } from "../types/enums";
+import { User } from "../models";
+import { asyncHandler } from "../utils/asyncHandler";
 
 /**
  * Authenticates the request from the access-token cookie (or, as a
@@ -9,7 +11,7 @@ import { Role } from "../types/enums";
  * Role/project/gate claims always come from the verified token — never
  * from request body/query — so a client cannot escalate its own access.
  */
-export function authenticate(req: Request, _res: Response, next: NextFunction) {
+export const authenticate = asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {
   const cookieToken = req.cookies?.accessToken;
   const header = req.headers.authorization;
   const headerToken = header?.startsWith("Bearer ") ? header.slice(7) : undefined;
@@ -20,22 +22,29 @@ export function authenticate(req: Request, _res: Response, next: NextFunction) {
   }
 
   for (const token of tokens) {
+    let payload;
     try {
-    const payload = verifyAccessToken(token);
-    req.user = {
-      id: payload.sub,
-      role: payload.role,
-      projectId: payload.projectId,
-      gateId: payload.gateId,
-    };
-      return next();
+      payload = verifyAccessToken(token);
     } catch {
-      // Try the next available credential before failing the request.
+      continue;
     }
+    const user = await User.findById(payload.sub).lean();
+    if (!user || user.status !== "ACTIVE" || (user.sessionVersion ?? 0) !== (payload.sessionVersion ?? 0)) continue;
+    const path = req.originalUrl.split("?")[0].replace(/\/$/, "");
+    if (user.mustChangePassword && !["/api/auth/me", "/api/auth/change-password", "/api/auth/logout", "/api/projects"].includes(path)) {
+      throw AppError.forbidden("Please change your temporary password before continuing.", "PASSWORD_CHANGE_REQUIRED");
+    }
+    req.user = {
+      id: String(user._id),
+      role: user.role,
+      projectId: user.projectId ? String(user.projectId) : null,
+      gateId: user.gateId ? String(user.gateId) : null,
+    };
+    return next();
   }
 
   next(AppError.unauthorized("Session expired. Please log in again.", "TOKEN_INVALID"));
-}
+});
 
 export function requireRole(...roles: Role[]) {
   return (req: Request, _res: Response, next: NextFunction) => {

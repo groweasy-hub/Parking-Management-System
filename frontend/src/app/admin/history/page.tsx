@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useProject } from "@/lib/project-context";
-import { apiFetch, apiUrl } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
+import { toast } from "sonner";
 import { Company, Floor, ParkingSessionRecord, VEHICLE_TYPES } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ export default function HistoryPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [floors, setFloors] = useState<Floor[]>([]);
@@ -36,10 +38,12 @@ export default function HistoryPage() {
 
   const pageSize = 25;
 
+  useEffect(() => { setPage(1); }, [currentProjectId, companyId, floorId, vehicleType, status, vehicleNumber]);
+
   useEffect(() => {
     if (!currentProjectId) return;
-    apiFetch<{ companies: Company[] }>(`/api/companies?projectId=${currentProjectId}`).then((d) => setCompanies(d.companies));
-    apiFetch<{ floors: Floor[] }>(`/api/floors?projectId=${currentProjectId}`).then((d) => setFloors(d.floors));
+    apiFetch<{ companies: Company[] }>(`/api/companies?projectId=${currentProjectId}`).then((d) => setCompanies(d.companies)).catch(() => setCompanies([]));
+    apiFetch<{ floors: Floor[] }>(`/api/floors?projectId=${currentProjectId}`).then((d) => setFloors(d.floors)).catch(() => setFloors([]));
   }, [currentProjectId]);
 
   const buildParams = useCallback(() => {
@@ -61,6 +65,8 @@ export default function HistoryPage() {
       const data = await apiFetch<{ sessions: ParkingSessionRecord[]; total: number }>(`/api/parking/history?${params}`);
       setSessions(data.sessions);
       setTotal(data.total);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to load history.");
     } finally {
       setLoading(false);
     }
@@ -71,10 +77,23 @@ export default function HistoryPage() {
     return () => clearTimeout(handle);
   }, [load]);
 
-  function handleExport() {
+  async function handleExport() {
     const params = buildParams();
     if (!params) return;
-    window.open(apiUrl(`/api/reports/history/export?${params}`), "_blank");
+    setExporting(true);
+    try {
+      const csv = await apiFetch<string>(`/api/reports/history/export?${params}`);
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `parking-history-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to export history.");
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -83,7 +102,7 @@ export default function HistoryPage() {
         title="Parking Activity History"
         description="Historical log of every vehicle entry and exit transaction across all gates."
         actions={
-          <Button variant="outline" onClick={handleExport} className="rounded-xl font-bold gap-1.5 h-10 tap-bounce shadow-xs">
+          <Button variant="outline" onClick={handleExport} disabled={exporting} className="rounded-xl font-bold gap-1.5 h-10 tap-bounce shadow-xs">
             <Download className="h-4 w-4" /> Export CSV
           </Button>
         }

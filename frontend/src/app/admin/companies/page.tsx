@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { useProject } from "@/lib/project-context";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/page-header";
-import { Bike, Building2, Car, Loader2, Mail, MapPin, Phone, Plus, Search, Wrench } from "lucide-react";
+import { Bike, Building2, Car, Loader2, Mail, Phone, Plus, Search, Wrench } from "lucide-react";
 
 type CompanyForm = {
   name: string;
@@ -60,6 +60,7 @@ export default function CompaniesPage() {
   });
 
   const form = useForm<CompanyForm>({ defaultValues: emptyCompany });
+  const officeFloor = useWatch({ control: form.control, name: "officeFloor" });
 
   const buildingFloorOptions = Array.from({ length: currentProject?.totalFloors ?? 0 }, (_, index) => String(index + 1));
 
@@ -73,6 +74,8 @@ export default function CompaniesPage() {
       ]);
       setCompanies(companyData.companies);
       setFloors(floorData.floors);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to load companies. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -117,8 +120,12 @@ export default function CompaniesPage() {
 
   async function createAllocation(vehicleType: VehicleType, capacity: number) {
     if (!currentProjectId || !createdCompany || !allocation.floorId || capacity <= 0) return;
-    await apiFetch("/api/parking-allocations", {
-      method: "POST",
+    const data = await apiFetch<{ allocations: ParkingAllocation[] }>(
+      `/api/parking-allocations?projectId=${currentProjectId}&companyId=${createdCompany._id}`
+    );
+    const existing = data.allocations.find((item) => item.floorId === allocation.floorId && item.vehicleType === vehicleType);
+    await apiFetch(existing ? `/api/parking-allocations/${existing._id}` : "/api/parking-allocations", {
+      method: existing ? "PATCH" : "POST",
       body: JSON.stringify({
         projectId: currentProjectId,
         companyId: createdCompany._id,
@@ -130,6 +137,10 @@ export default function CompaniesPage() {
   }
 
   async function saveAllocation() {
+    if (!allocation.floorId || (Number(allocation.carCapacity) <= 0 && Number(allocation.bikeCapacity) <= 0)) {
+      toast.error("Select a parking floor and allocate at least one space.");
+      return;
+    }
     setSubmitting(true);
     try {
       await createAllocation("CAR", Number(allocation.carCapacity) || 0);
@@ -187,7 +198,7 @@ export default function CompaniesPage() {
                     <Input {...form.register("name", { required: true })} placeholder="Example: ABC Technologies" />
                   </Field>
                   <Field label="Company Floor">
-                    <Select value={form.watch("officeFloor")} onValueChange={(value) => form.setValue("officeFloor", value ?? "")}>
+                    <Select value={officeFloor} onValueChange={(value) => form.setValue("officeFloor", value ?? "")}>
                       <SelectTrigger><SelectValue placeholder="Select building floor" /></SelectTrigger>
                       <SelectContent>
                         {buildingFloorOptions.map((floor) => (

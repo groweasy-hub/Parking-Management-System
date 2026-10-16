@@ -2,13 +2,15 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
-import { Company, GateDuty } from "../models";
+import { Company, GateDuty, Project } from "../models";
 import { ParkingSession } from "../models";
 import { VEHICLE_TYPES, SESSION_STATUSES } from "../types/enums";
 import { ensureProjectAccess } from "../middleware/auth";
 import { allocationVehicleTypeFor, getCompanyAvailability } from "../services/availabilityService";
 import { createEntry, completeExit } from "../services/parkingService";
 import { createParkingQrToken, verifyParkingQrToken } from "../utils/parkingQr";
+import { businessDateKey, dateRange } from "../utils/dates";
+import { escapeRegex } from "../utils/search";
 
 export const availabilityQuerySchema = z.object({
   projectId: z.string().min(1),
@@ -86,6 +88,9 @@ export const getAvailability = asyncHandler(async (req: Request, res: Response) 
 
   const company = await Company.findOne({ _id: companyId, projectId }).lean();
   if (!company) throw AppError.notFound("Company not found for this project.");
+  if (company.status !== "ACTIVE" || !await Project.exists({ _id: projectId, status: "ACTIVE" })) {
+    throw AppError.badRequest("This company or project is inactive.", "PARKING_INACTIVE");
+  }
 
   const allocations = await getCompanyAvailability(projectId, companyId, vehicleType, floorId);
   if (allocations.length === 0) {
@@ -106,7 +111,7 @@ export const createEntryHandler = asyncHandler(async (req: Request, res: Respons
   if (req.user!.role !== "GATEKEEPER") {
     throw AppError.forbidden("Only entry gate staff can record vehicle entries.");
   }
-  const duty = await GateDuty.findOne({ userId: req.user!.id, dutyDate: new Date().toISOString().slice(0, 10) }).lean();
+  const duty = await GateDuty.findOne({ userId: req.user!.id, dutyDate: businessDateKey(), endedAt: null }).lean();
   if (!duty || duty.gateType !== "ENTRY" || String(duty.gateId) !== data.entryGateId) {
     throw AppError.forbidden("Please select today's entry gate before recording entries.");
   }
@@ -133,7 +138,7 @@ export const createExitHandler = asyncHandler(async (req: Request, res: Response
   if (req.user!.role !== "GATEKEEPER") {
     throw AppError.forbidden("Only exit gate staff can record vehicle exits.");
   }
-  const duty = await GateDuty.findOne({ userId: req.user!.id, dutyDate: new Date().toISOString().slice(0, 10) }).lean();
+  const duty = await GateDuty.findOne({ userId: req.user!.id, dutyDate: businessDateKey(), endedAt: null }).lean();
   if (!duty || duty.gateType !== "EXIT" || String(duty.gateId) !== data.exitGateId) {
     throw AppError.forbidden("Please select today's exit gate before recording exits.");
   }
@@ -216,24 +221,24 @@ export const listActiveSessions = asyncHandler(async (req: Request, res: Respons
   if (query.vehicleType) filter.vehicleType = query.vehicleType;
   if (query.floorId) filter.floorId = query.floorId;
   if (query.vehicleNumber) {
-    filter.vehicleNumber = { $regex: query.vehicleNumber.trim().toUpperCase(), $options: "i" };
+    filter.vehicleNumber = { $regex: escapeRegex(query.vehicleNumber.trim().toUpperCase()), $options: "i" };
   }
   if (query.search) {
     filter.$or = [
-      { vehicleNumber: { $regex: query.search, $options: "i" } },
-      { sessionCode: { $regex: query.search, $options: "i" } },
+      { vehicleNumber: { $regex: escapeRegex(query.search), $options: "i" } },
+      { sessionCode: { $regex: escapeRegex(query.search), $options: "i" } },
     ];
   }
 
+  const total = await ParkingSession.countDocuments(filter);
   const sessions = await ParkingSession.find(filter)
     .sort({ entryTime: -1 })
-    .limit(200)
     .populate("companyId", "name logoUrl")
     .populate("floorId", "name code")
     .populate("entryGateId", "name")
     .lean();
 
-  res.json({ sessions });
+  res.json({ sessions, total });
 });
 
 export const historyQuerySchema = z.object({
@@ -265,19 +270,13 @@ export const listHistory = asyncHandler(async (req: Request, res: Response) => {
   if (query.entryGateId) filter.entryGateId = query.entryGateId;
   if (query.exitGateId) filter.exitGateId = query.exitGateId;
   if (query.vehicleNumber) {
-    filter.vehicleNumber = { $regex: query.vehicleNumber.trim().toUpperCase(), $options: "i" };
+    filter.vehicleNumber = { $regex: escapeRegex(query.vehicleNumber.trim().toUpperCase()), $options: "i" };
   }
   if (query.entryDateFrom || query.entryDateTo) {
-    filter.entryTime = {
-      ...(query.entryDateFrom ? { $gte: new Date(query.entryDateFrom) } : {}),
-      ...(query.entryDateTo ? { $lte: new Date(query.entryDateTo) } : {}),
-    };
+    filter.entryTime = dateRange(query.entryDateFrom, query.entryDateTo);
   }
   if (query.exitDateFrom || query.exitDateTo) {
-    filter.exitTime = {
-      ...(query.exitDateFrom ? { $gte: new Date(query.exitDateFrom) } : {}),
-      ...(query.exitDateTo ? { $lte: new Date(query.exitDateTo) } : {}),
-    };
+    filter.exitTime = dateRange(query.exitDateFrom, query.exitDateTo);
   }
 
   const skip = (query.page - 1) * query.pageSize;

@@ -3,6 +3,9 @@
 import { useEffect, useRef } from "react";
 import { getSocket } from "@/lib/socket";
 import { AllocationAvailability } from "@/lib/types";
+import { useAuth } from "@/lib/auth-context";
+
+const roomSubscribers = new Map<string, number>();
 
 export interface SessionEventPayload {
   sessionId: string;
@@ -23,6 +26,7 @@ interface RealtimeHandlers {
  * re-subscribing the socket listeners.
  */
 export function useProjectRealtime(projectId: string | null | undefined, handlers: RealtimeHandlers) {
+  const { user } = useAuth();
   const handlersRef = useRef(handlers);
 
   useEffect(() => {
@@ -30,8 +34,9 @@ export function useProjectRealtime(projectId: string | null | undefined, handler
   });
 
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || !user || user.mustChangePassword) return;
     const socket = getSocket();
+    roomSubscribers.set(projectId, (roomSubscribers.get(projectId) ?? 0) + 1);
 
     const join = () => socket.emit("join:project", projectId);
     if (socket.connected) join();
@@ -47,11 +52,17 @@ export function useProjectRealtime(projectId: string | null | undefined, handler
     socket.on("session:exit", onExit);
 
     return () => {
-      socket.emit("leave:project", projectId);
+      const remaining = (roomSubscribers.get(projectId) ?? 1) - 1;
+      if (remaining <= 0) {
+        roomSubscribers.delete(projectId);
+        socket.emit("leave:project", projectId);
+      } else {
+        roomSubscribers.set(projectId, remaining);
+      }
       socket.off("connect", join);
       socket.off("availability:update", onAvailability);
       socket.off("session:entry", onEntry);
       socket.off("session:exit", onExit);
     };
-  }, [projectId]);
+  }, [projectId, user]);
 }

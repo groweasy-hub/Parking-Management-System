@@ -33,6 +33,8 @@ export default function FloorsPage() {
     try {
       const data = await apiFetch<{ floors: Floor[] }>(`/api/floors?projectId=${currentProjectId}`);
       setFloors(data.floors);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to load floors. Please try again.");
     } finally {
       setLoading(false);
     }

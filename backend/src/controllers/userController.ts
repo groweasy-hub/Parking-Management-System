@@ -2,7 +2,8 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
-import { User } from "../models";
+import { Project, User } from "../models";
+import { disconnectUserSessions } from "../realtime/socketServer";
 import { ROLES } from "../types/enums";
 import { ensureProjectAccess } from "../middleware/auth";
 import { recordAudit } from "../services/auditService";
@@ -88,6 +89,9 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
     throw AppError.badRequest("projectId is required for this role.");
   }
   if (data.projectId) ensureProjectAccess(requester, data.projectId);
+  if (data.role !== "SUPER_ADMIN" && !await Project.exists({ _id: data.projectId, status: "ACTIVE" })) {
+    throw AppError.badRequest("Please select an active project.");
+  }
 
   const existing = await User.findOne({ email: data.email.toLowerCase() }).lean();
   if (existing) throw AppError.conflict(GENERIC_REGISTRATION_ERROR, "REGISTRATION_FAILED");
@@ -132,12 +136,18 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
 
 export const updateUser = asyncHandler(async (req: Request, res: Response) => {
   const requester = req.user!;
-  const existing = await User.findById(req.params.id);
+  const existing = await User.findById(req.params.id).select("+passwordResetTokenHash +passwordResetExpiresAt");
   if (!existing) throw AppError.notFound("Unable to update user.", "USER_UPDATE_FAILED");
   if (existing.projectId) ensureProjectAccess(requester, String(existing.projectId));
   else if (requester.role !== "SUPER_ADMIN") throw AppError.forbidden();
 
   const data = req.body as z.infer<typeof updateUserSchema>;
+  if (requester.role === "PROJECT_ADMIN" && !PROJECT_ADMIN_CREATABLE_ROLES.includes(existing.role)) {
+    throw AppError.forbidden("Project admins can only update gate or viewer users.");
+  }
+  if (requester.id === String(existing._id) && data.status === "INACTIVE") {
+    throw AppError.badRequest("You cannot deactivate your own account.");
+  }
   if (data.name !== undefined) existing.name = data.name;
   if (data.phone !== undefined) existing.phone = data.phone;
   if (data.customRoleLabel !== undefined) existing.customRoleLabel = data.customRoleLabel;
@@ -145,9 +155,15 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
   if (data.password) {
     existing.passwordHash = await hashPassword(data.password);
     existing.mustChangePassword = existing.role === "GATEKEEPER";
+    existing.passwordResetTokenHash = undefined;
+    existing.passwordResetExpiresAt = undefined;
+  }
+  if (data.password || (data.status && existing.isModified("status"))) {
+    existing.sessionVersion = (existing.sessionVersion ?? 0) + 1;
   }
 
   await existing.save();
+  if (data.password || data.status === "INACTIVE") disconnectUserSessions(String(existing._id));
 
   await recordAudit({
     userId: requester.id,

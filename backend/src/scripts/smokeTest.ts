@@ -27,7 +27,7 @@ function check(name: string, condition: boolean, detail?: unknown) {
 
 async function main() {
   console.log("Starting single-node MongoDB replica set (required for transactions)...");
-  const replSet = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: "wiredTiger" } });
+  const replSet = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: "wiredTiger" }, instanceOpts: [{ launchTimeout: 60000 }] });
   process.env.MONGODB_URI = replSet.getUri("parking_smoke_test");
   process.env.JWT_ACCESS_SECRET = "smoke-test-access-secret";
   process.env.JWT_REFRESH_SECRET = "smoke-test-refresh-secret";

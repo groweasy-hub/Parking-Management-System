@@ -7,7 +7,7 @@
     "node": "22.x"
   },
   "scripts": {
-    "dev": "set NODE_OPTIONS=--openssl-legacy-provider && tsx watch src/server.ts",
+    "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "postinstall": "npm run build",
     "start": "node dist/server.js",
@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "smoke-test": "tsx src/scripts/smokeTest.ts",
     "smoke-test:http": "tsx src/scripts/httpSmokeTest.ts",
-    "smoke-test:password-reset": "tsx src/scripts/passwordResetSmokeTest.ts"
+    "smoke-test:password-reset": "tsx src/scripts/passwordResetSmokeTest.ts",
+    "smoke-test:handoff": "tsx src/scripts/handoffSmokeTest.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

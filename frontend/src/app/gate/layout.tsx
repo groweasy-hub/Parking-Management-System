@@ -50,10 +50,10 @@ export default function GateLayout({ children }: { children: ReactNode }) {
   const loadParkedCount = useCallback(async () => {
     if (!currentProjectId) return;
     try {
-      const data = await apiFetch<{ sessions: { _id: string }[] }>(
+      const data = await apiFetch<{ sessions: { _id: string }[]; total: number }>(
         `/api/parking/active?projectId=${currentProjectId}`
       );
-      setParkedCount(data.sessions.length);
+      setParkedCount(data.total);
     } catch {
       // silent
     }
@@ -163,7 +163,7 @@ export default function GateLayout({ children }: { children: ReactNode }) {
           <SheetContent side="bottom" className="rounded-t-3xl p-0 sm:left-auto sm:right-4 sm:bottom-4 sm:max-w-md sm:rounded-3xl sm:border">
             <SheetHeader className="border-b p-5 text-left">
               <SheetTitle className="text-xl font-black">Gatekeeper Profile</SheetTitle>
-              <SheetDescription className="text-xs">Your account and today's selected gate.</SheetDescription>
+              <SheetDescription className="text-xs">Your account and today&apos;s selected gate.</SheetDescription>
             </SheetHeader>
             <div className="space-y-4 p-5">
               <div className="flex items-center gap-3 rounded-2xl border bg-muted/30 p-3">

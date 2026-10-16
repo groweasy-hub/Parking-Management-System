@@ -38,6 +38,8 @@ export default function GateSelectPage() {
       ]);
       setGates(gateData.gates.filter((gate) => gate.status === "ACTIVE"));
       setDuty(dutyData.duty);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to load gates. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -119,6 +121,8 @@ export default function GateSelectPage() {
             <div className="py-8 text-center">
               <Loader2 className="mx-auto h-6 w-6 animate-spin" />
             </div>
+          ) : gates.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">No active gates are available. Please contact your administrator.</p>
           ) : (
             gates.map((gate) => {
               const Icon = gate.type === "ENTRY" ? ArrowDownToLine : ArrowUpFromLine;

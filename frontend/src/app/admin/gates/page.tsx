@@ -36,6 +36,8 @@ export default function GatesPage() {
     try {
       const data = await apiFetch<{ gates: Gate[] }>(`/api/gates?projectId=${currentProjectId}`);
       setGates(data.gates);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to load gates. Please try again.");
     } finally {
       setLoading(false);
     }

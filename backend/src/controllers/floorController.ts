@@ -5,6 +5,7 @@ import { AppError } from "../utils/AppError";
 import { Floor, ParkingAllocation } from "../models";
 import { ensureProjectAccess } from "../middleware/auth";
 import { recordAudit } from "../services/auditService";
+import { runInTransaction } from "../utils/transaction";
 
 export const createFloorSchema = z.object({
   projectId: z.string().min(1),
@@ -76,8 +77,20 @@ export const updateFloor = asyncHandler(async (req: Request, res: Response) => {
 
   const data = req.body as z.infer<typeof updateFloorSchema>;
   if (data.code) data.code = data.code.toUpperCase();
-  Object.assign(existing, data);
-  await existing.save();
+  const floor = await runInTransaction(async (session) => {
+    const current = await Floor.findOneAndUpdate({ _id: existing._id }, { $inc: { allocationRevision: 1 } }, { session, new: true });
+    if (!current) throw AppError.notFound("Floor not found.");
+    const allocations = await ParkingAllocation.find({ floorId: current._id, status: "ACTIVE" }).session(session).lean();
+    for (const [type, field] of [["CAR", "carCapacity"], ["BIKE", "bikeCapacity"]] as const) {
+      const allocated = allocations.filter((item) => item.vehicleType === type).reduce((total, item) => total + item.capacity, 0);
+      if (data[field] !== undefined && data[field]! < allocated) {
+        throw AppError.badRequest(`Floor capacity cannot be lower than its ${allocated} allocated ${type.toLowerCase()} spaces.`, "FLOOR_CAPACITY_EXCEEDED");
+      }
+    }
+    Object.assign(current, data);
+    await current.save({ session });
+    return current;
+  });
 
   await recordAudit({
     userId: req.user!.id,
@@ -88,7 +101,7 @@ export const updateFloor = asyncHandler(async (req: Request, res: Response) => {
     metadata: data,
   });
 
-  res.json({ floor: existing });
+  res.json({ floor });
 });
 
 export const deleteFloor = asyncHandler(async (req: Request, res: Response) => {

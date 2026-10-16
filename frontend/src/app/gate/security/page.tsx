@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, ApiError, setAccessToken } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { hashMpin, hasMpinForUser, markMpinUnlocked, mpinHashKey } from "@/lib/gate-security";
 
@@ -71,10 +71,11 @@ export default function GateSecurityPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await apiFetch("/api/auth/change-password", {
+      const data = await apiFetch<{ accessToken: string }>("/api/auth/change-password", {
         method: "POST",
         body: JSON.stringify({ oldPassword, newPassword }),
       });
+      setAccessToken(data.accessToken);
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");

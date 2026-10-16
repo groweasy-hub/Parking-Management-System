@@ -9,6 +9,7 @@ import {
   Occupancy,
   ParkingAllocation,
   ParkingSession,
+  Project,
 } from "../models";
 import { VehicleType } from "../types/enums";
 import { recordAudit } from "./auditService";
@@ -67,6 +68,9 @@ async function assertEntityInProject(
  * "Parking is no longer available" error instead of overbooking capacity.
  */
 export async function createEntry(input: EntryInput) {
+  if (!await Project.exists({ _id: input.projectId, status: "ACTIVE" })) {
+    throw AppError.badRequest("This project is inactive.", "PROJECT_INACTIVE");
+  }
   const vehicleNumber = normalizeVehicleNumber(input.vehicleNumber);
   const allocationVehicleType = allocationVehicleTypeFor(input.vehicleType);
 
@@ -115,6 +119,8 @@ export async function createEntry(input: EntryInput) {
 
   try {
     const session = await runInTransaction(async (dbSession: ClientSession) => {
+      const currentAllocation = await ParkingAllocation.findOne({ _id: allocation._id, status: "ACTIVE" }).session(dbSession).lean();
+      if (!currentAllocation) throw AppError.conflict("This parking allocation is no longer active.", "ALLOCATION_INACTIVE");
       const updatedOccupancy = await Occupancy.findOneAndUpdate(
         { allocationId: allocation._id, $expr: { $lt: ["$occupied", "$capacity"] } },
         { $inc: { occupied: 1 } },
@@ -204,6 +210,7 @@ export async function completeExit(input: ExitInput) {
 
   const gate = await Gate.findOne({ _id: input.exitGateId, projectId: existing.projectId }).lean();
   if (!gate) throw AppError.badRequest("Exit gate not found for this project.", "GATE_NOT_FOUND");
+  if (gate.status !== "ACTIVE") throw AppError.badRequest("This gate is inactive.", "GATE_INACTIVE");
   if (gate.type !== "EXIT") throw AppError.badRequest("This gate is not configured for exit.", "GATE_WRONG_TYPE");
 
   const result = await runInTransaction(async (dbSession: ClientSession) => {

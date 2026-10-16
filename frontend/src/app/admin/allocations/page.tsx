@@ -47,6 +47,8 @@ export default function AllocationsPage() {
       setAllocations(a.allocations.filter((allocation) => allocation.vehicleType !== "OTHER"));
       setCompanies(c.companies);
       setFloors(f.floors);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to load allocations. Please try again.");
     } finally {
       setLoading(false);
     }

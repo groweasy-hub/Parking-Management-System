@@ -60,6 +60,9 @@ export const updateGate = asyncHandler(async (req: Request, res: Response) => {
   ensureProjectAccess(req.user!, String(existing.projectId));
 
   const data = req.body as z.infer<typeof updateGateSchema>;
+  if (data.type && data.type !== existing.type && await GateDuty.exists({ gateId: existing._id, endedAt: null })) {
+    throw AppError.badRequest("Wind up active gate duties before changing this gate's operation type.", "GATE_IN_USE");
+  }
   Object.assign(existing, data);
   await existing.save();
 

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useProject } from "@/lib/project-context";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,7 +41,8 @@ interface UtilizationRow {
 }
 
 function isoDaysAgo(days: number) {
-  return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const date = new Date(Date.now() - days * 86400000);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function formatDuration(minutes: number) {
@@ -64,6 +66,7 @@ export default function ReportsPage() {
 
   const load = useCallback(async () => {
     if (!currentProjectId) return;
+    if (!from || !to || from > to) return;
     setLoading(true);
     try {
       const params = new URLSearchParams({ projectId: currentProjectId, from, to });
@@ -79,6 +82,8 @@ export default function ReportsPage() {
       setPeak(peakData);
       setAvgDuration(duration);
       setActiveCount(active.activeVehicles);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to load reports.");
     } finally {
       setLoading(false);
     }

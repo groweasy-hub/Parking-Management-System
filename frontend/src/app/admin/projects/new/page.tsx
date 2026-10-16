@@ -17,8 +17,8 @@ import { ArrowLeft, ArrowRight, Bike, Building2, Car, DoorOpen, Loader2, Parking
 
 type ProjectForm = { name: string; address: string; totalFloors: number };
 type ParkingSetupForm = { count: number; prefix: string };
-type ParkingFloorDraft = { name: string; code: string; carCapacity: number; bikeCapacity: number };
-type GateDraft = { name: string; type: "ENTRY" | "EXIT" };
+type ParkingFloorDraft = { id?: string; name: string; code: string; carCapacity: number; bikeCapacity: number };
+type GateDraft = { id?: string; name: string; type: "ENTRY" | "EXIT" };
 
 const STEPS = ["Project", "Parking Floors", "Gates", "Review"] as const;
 
@@ -42,8 +42,8 @@ export default function NewProjectWizard() {
   async function createProject(values: ProjectForm) {
     setSubmitting(true);
     try {
-      const data = await apiFetch<{ project: Project }>("/api/projects", {
-        method: "POST",
+      const data = await apiFetch<{ project: Project }>(project ? `/api/projects/${project._id}` : "/api/projects", {
+        method: project ? "PATCH" : "POST",
         body: JSON.stringify({
           name: values.name,
           address: values.address || undefined,
@@ -61,7 +61,7 @@ export default function NewProjectWizard() {
   }
 
   function generateParkingFloors(values: ParkingSetupForm) {
-    const count = Math.max(1, Number(values.count) || 1);
+    const count = Math.min(100, Math.max(1, Math.floor(Number(values.count) || 1)));
     const prefix = (values.prefix || "B").trim().toUpperCase();
     setFloorDrafts(
       Array.from({ length: count }, (_, index) => {
@@ -77,12 +77,22 @@ export default function NewProjectWizard() {
 
   async function saveParkingFloors() {
     if (!project || floorDrafts.length === 0) return;
+    const codes = floorDrafts.map((floor) => floor.code.trim().toUpperCase());
+    if (new Set(codes).size !== codes.length || floorDrafts.some((floor) =>
+      !floor.name.trim() || !floor.code.trim() || floor.code.trim().length > 10 ||
+      !Number.isInteger(floor.carCapacity) || floor.carCapacity < 0 || !Number.isInteger(floor.bikeCapacity) || floor.bikeCapacity < 0
+    )) {
+      toast.error("Use unique floor codes, a name for each floor, and whole-number capacities of zero or more.");
+      return;
+    }
     setSubmitting(true);
     try {
       const created: Floor[] = [];
+      const saved = await apiFetch<{ floors: Floor[] }>(`/api/floors?projectId=${project._id}`);
       for (const [index, floor] of floorDrafts.entries()) {
-        const data = await apiFetch<{ floor: Floor }>("/api/floors", {
-          method: "POST",
+        const existing = saved.floors.find((item) => item._id === floor.id || item.code === floor.code.trim().toUpperCase());
+        const data = await apiFetch<{ floor: Floor }>(existing ? `/api/floors/${existing._id}` : "/api/floors", {
+          method: existing ? "PATCH" : "POST",
           body: JSON.stringify({
             projectId: project._id,
             name: floor.name,
@@ -94,6 +104,7 @@ export default function NewProjectWizard() {
           }),
         });
         created.push(data.floor);
+        setFloorDrafts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, id: data.floor._id } : item));
       }
       setParkingFloors(created);
       setStep(2);
@@ -112,15 +123,23 @@ export default function NewProjectWizard() {
 
   async function saveGates() {
     if (!project || gateDrafts.length === 0) return;
+    const names = gateDrafts.map((gate) => gate.name.trim().toLowerCase());
+    if (names.some((name) => !name) || new Set(names).size !== names.length) {
+      toast.error("Enter a unique name for each gate.");
+      return;
+    }
     setSubmitting(true);
     try {
       const created: Gate[] = [];
-      for (const gate of gateDrafts) {
-        const data = await apiFetch<{ gate: Gate }>("/api/gates", {
-          method: "POST",
+      const saved = await apiFetch<{ gates: Gate[] }>(`/api/gates?projectId=${project._id}`);
+      for (const [index, gate] of gateDrafts.entries()) {
+        const existing = saved.gates.find((item) => item._id === gate.id || item.name === gate.name.trim());
+        const data = await apiFetch<{ gate: Gate }>(existing ? `/api/gates/${existing._id}` : "/api/gates", {
+          method: existing ? "PATCH" : "POST",
           body: JSON.stringify({ projectId: project._id, name: gate.name, type: gate.type }),
         });
         created.push(data.gate);
+        setGateDrafts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, id: data.gate._id } : item));
       }
       setGates(created);
       setStep(3);
@@ -132,9 +151,9 @@ export default function NewProjectWizard() {
     }
   }
 
-  function finish() {
+  async function finish() {
+    await refresh();
     if (project) setCurrentProjectId(project._id);
-    refresh();
     toast.success("Project setup completed.");
     router.push("/admin/companies");
   }
@@ -222,7 +241,7 @@ export default function NewProjectWizard() {
               ))}
             </div>
 
-            <WizardActions onBack={() => setStep(0)} onNext={saveParkingFloors} disabled={submitting || floorDrafts.length === 0} nextLabel="Save Parking Floors" />
+            <WizardActions onBack={() => setStep(0)} onNext={saveParkingFloors} busy={submitting} disabled={submitting || floorDrafts.length === 0} nextLabel="Save Parking Floors" />
           </CardContent>
         </Card>
       )}
@@ -250,7 +269,7 @@ export default function NewProjectWizard() {
                 </div>
               ))}
             </div>
-            <WizardActions onBack={() => setStep(1)} onNext={saveGates} disabled={submitting || gateDrafts.length === 0} nextLabel="Save Gates" />
+            <WizardActions onBack={() => setStep(1)} onNext={saveGates} busy={submitting} disabled={submitting || gateDrafts.length === 0} nextLabel="Save Gates" />
           </CardContent>
         </Card>
       )}
@@ -293,10 +312,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function WizardActions({ onBack, onNext, disabled, nextLabel }: { onBack: () => void; onNext: () => void; disabled?: boolean; nextLabel: string }) {
+function WizardActions({ onBack, onNext, disabled, busy, nextLabel }: { onBack: () => void; onNext: () => void; disabled?: boolean; busy?: boolean; nextLabel: string }) {
   return (
     <div className="flex justify-between border-t pt-4">
-      <Button variant="outline" onClick={onBack}><ArrowLeft className="h-4 w-4" /> Back</Button>
+      <Button variant="outline" onClick={onBack} disabled={busy}><ArrowLeft className="h-4 w-4" /> Back</Button>
       <Button onClick={onNext} disabled={disabled} className="font-bold">{nextLabel} <ArrowRight className="h-4 w-4" /></Button>
     </div>
   );

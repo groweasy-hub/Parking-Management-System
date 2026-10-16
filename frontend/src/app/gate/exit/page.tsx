@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import jsQR from "jsqr";
 import { toast } from "sonner";
 import { useProject } from "@/lib/project-context";
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, ApiError, apiUrl } from "@/lib/api";
 import { deferNavigation } from "@/lib/deferred-navigation";
 import { Gate, ParkingSessionRecord, VehicleType } from "@/lib/types";
 import { useProjectRealtime } from "@/hooks/useRealtime";
@@ -904,7 +904,7 @@ export default function ExitGatePage() {
                           {company.logoUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
-                              src={company.logoUrl}
+                              src={company.logoUrl.startsWith("/") ? apiUrl(company.logoUrl) : company.logoUrl}
                               alt={company.name}
                               className="h-10 w-10 rounded-xl object-cover border shrink-0"
                             />

@@ -2,6 +2,8 @@ import fs from "fs";
 import path from "path";
 import { v2 as cloudinary } from "cloudinary";
 import { env } from "../config/env";
+import { randomUUID } from "node:crypto";
+import { AppError } from "../utils/AppError";
 
 const UPLOAD_DIR = path.join(process.cwd(), "uploads", "logos");
 const cloudinaryConfigured = Boolean(
@@ -31,8 +33,13 @@ export interface UploadResult {
 
 export async function uploadCompanyLogo(
   buffer: Buffer,
-  originalName: string
+  _originalName: string
 ): Promise<UploadResult> {
+  const extension = buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ? "png"
+    : buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff ? "jpg"
+    : ["GIF87a", "GIF89a"].includes(buffer.subarray(0, 6).toString()) ? "gif"
+    : buffer.subarray(0, 4).toString() === "RIFF" && buffer.subarray(8, 12).toString() === "WEBP" ? "webp" : null;
+  if (!extension) throw AppError.badRequest("This file is not a supported image.", "INVALID_UPLOAD");
   if (cloudinaryConfigured) {
     const result = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
@@ -47,7 +54,7 @@ export async function uploadCompanyLogo(
     return { url: result.secure_url, storageId: result.public_id };
   }
 
-  const safeName = `${Date.now()}-${originalName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  const safeName = `${randomUUID()}.${extension}`;
   const filePath = path.join(UPLOAD_DIR, safeName);
   await fs.promises.writeFile(filePath, buffer);
   return { url: `/uploads/logos/${safeName}`, storageId: safeName };

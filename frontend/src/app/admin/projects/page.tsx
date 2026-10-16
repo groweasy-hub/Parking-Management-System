@@ -49,6 +49,8 @@ export default function ProjectsPage() {
     try {
       const data = await apiFetch<{ projects: Project[] }>("/api/projects");
       setProjects(data.projects);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to load projects. Please try again.");
     } finally {
       setLoading(false);
     }

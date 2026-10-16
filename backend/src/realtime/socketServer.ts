@@ -2,6 +2,7 @@ import { Server as HttpServer } from "http";
 import { Server as SocketIOServer, Socket } from "socket.io";
 import { env } from "../config/env";
 import { verifyAccessToken } from "../utils/jwt";
+import { User } from "../models";
 
 let io: SocketIOServer | null = null;
 
@@ -10,7 +11,7 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
     cors: { origin: env.corsOrigin, credentials: true },
   });
 
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       const token =
         socket.handshake.auth?.token ??
@@ -22,6 +23,12 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
 
       if (!token) return next(new Error("UNAUTHORIZED"));
       const payload = verifyAccessToken(token);
+      const user = await User.findById(payload.sub).lean();
+      if (!user || user.status !== "ACTIVE" || user.mustChangePassword || (user.sessionVersion ?? 0) !== (payload.sessionVersion ?? 0)) {
+        return next(new Error("UNAUTHORIZED"));
+      }
+      payload.role = user.role;
+      payload.projectId = user.projectId ? String(user.projectId) : null;
       socket.data.user = payload;
       next();
     } catch {
@@ -31,6 +38,7 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
 
   io.on("connection", (socket: Socket) => {
     const user = socket.data.user as { sub: string; role: string; projectId: string | null };
+    socket.join(`user:${user.sub}`);
 
     socket.on("join:project", (projectId: string) => {
       if (!projectId) return;
@@ -54,4 +62,8 @@ export function getIO(): SocketIOServer {
 
 export function broadcastToProject(projectId: string, event: string, payload: unknown): void {
   io?.to(`project:${projectId}`).emit(event, payload);
+}
+
+export function disconnectUserSessions(userId: string): void {
+  io?.in(`user:${userId}`).disconnectSockets(true);
 }

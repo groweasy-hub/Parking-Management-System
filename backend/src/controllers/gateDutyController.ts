@@ -5,9 +5,10 @@ import { AppError } from "../utils/AppError";
 import { Gate, GateDuty } from "../models";
 import { ensureProjectAccess } from "../middleware/auth";
 import { recordAudit } from "../services/auditService";
+import { businessDateKey } from "../utils/dates";
 
 function todayKey(date = new Date()) {
-  return date.toISOString().slice(0, 10);
+  return businessDateKey(date);
 }
 
 export const startGateDutySchema = z.object({
@@ -17,7 +18,7 @@ export const startGateDutySchema = z.object({
 
 export const attendanceQuerySchema = z.object({
   projectId: z.string().min(1),
-  month: z.string().regex(/^\d{4}-\d{2}$/),
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
 });
 
 export const getTodayDuty = asyncHandler(async (req: Request, res: Response) => {
@@ -39,13 +40,12 @@ export const startGateDuty = asyncHandler(async (req: Request, res: Response) =>
   if (!gate) throw AppError.badRequest("Active gate not found for this project.");
 
   const duty = await GateDuty.findOneAndUpdate(
-    { userId: req.user!.id, dutyDate: todayKey() },
+    { userId: req.user!.id, dutyDate: todayKey(), $or: [{ endedAt: { $ne: null } }, { gateId: gate._id }] },
     {
+      $set: { gateId: gate._id, gateType: gate.type, endedAt: null },
       $setOnInsert: {
         userId: req.user!.id,
         projectId: data.projectId,
-        gateId: gate._id,
-        gateType: gate.type,
         dutyDate: todayKey(),
         startedAt: new Date(),
         entryCount: 0,
@@ -53,7 +53,12 @@ export const startGateDuty = asyncHandler(async (req: Request, res: Response) =>
       },
     },
     { upsert: true, new: true }
-  ).populate("gateId", "name type");
+  ).populate("gateId", "name type").catch((error: unknown) => {
+    if ((error as { code?: number })?.code === 11000) {
+      throw AppError.conflict("You already have an active gate duty. Wind it up before selecting another gate.", "DUTY_ALREADY_ACTIVE");
+    }
+    throw error;
+  });
 
   await recordAudit({
     userId: req.user!.id,

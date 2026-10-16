@@ -23,6 +23,9 @@ export const listAuditLogs = asyncHandler(async (req: Request, res: Response) =>
 
   const page = Math.max(1, Number(req.query.page ?? 1));
   const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize ?? 50)));
+  if (!Number.isInteger(page) || !Number.isInteger(pageSize)) {
+    throw AppError.badRequest("Page and page size must be whole numbers.", "VALIDATION_ERROR");
+  }
 
   const [logs, total] = await Promise.all([
     AuditLog.find(filter)

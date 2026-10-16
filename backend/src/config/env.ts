@@ -38,6 +38,7 @@ function parseCorsOrigins(value: string): string[] {
 
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
+  timeZone: process.env.APP_TIMEZONE ?? "Asia/Kolkata",
   port: Number(process.env.PORT ?? 4000),
   mongodbUri: required("MONGODB_URI"),
   jwt: {

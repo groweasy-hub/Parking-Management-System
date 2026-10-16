@@ -98,7 +98,10 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
   const body = contentType.includes("application/json") ? await res.json() : await res.text();
 
   if (!res.ok) {
-    if (res.status === 401) setAccessToken(null);
+    if (res.status === 401) {
+      setAccessToken(null);
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("parkflow:session-expired"));
+    }
     const message =
       typeof body === "object" && body && "error" in body
         ? (body as { error: { message: string; code: string } }).error.message

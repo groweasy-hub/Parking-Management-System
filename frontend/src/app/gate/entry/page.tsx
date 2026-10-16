@@ -166,9 +166,10 @@ export default function EntryGatePage() {
       `/api/companies?projectId=${currentProjectId}&search=${encodeURIComponent(search)}`
     )
       .then((d) => {
-        setCompanies(d.companies);
-        if (!selectedCompany && d.companies.length > 0) {
-          setSelectedCompany(d.companies[0]);
+        const activeCompanies = d.companies.filter((company) => company.status === "ACTIVE");
+        setCompanies(activeCompanies);
+        if (!selectedCompany && activeCompanies.length > 0) {
+          setSelectedCompany(activeCompanies[0]);
         }
       })
       .catch(() => setCompanies([]))
@@ -181,9 +182,10 @@ export default function EntryGatePage() {
     setFloorsLoading(true);
     apiFetch<{ floors: Floor[] }>(`/api/floors?projectId=${currentProjectId}`)
       .then((d) => {
-        setFloors(d.floors);
-        if (!selectedFloor && d.floors.length > 0) {
-          setSelectedFloor(d.floors[0]);
+        const activeFloors = d.floors.filter((floor) => floor.status === "ACTIVE");
+        setFloors(activeFloors);
+        if (!selectedFloor && activeFloors.length > 0) {
+          setSelectedFloor(activeFloors[0]);
         }
       })
       .catch(() => setFloors([]))
@@ -240,7 +242,7 @@ export default function EntryGatePage() {
         if (activeTab === "floor" && flr) {
           targetAlloc = data.allocations.find((a) => a.floorId === flr._id);
         }
-        if (!targetAlloc) {
+        if (!targetAlloc && (activeTab !== "floor" || !flr)) {
           targetAlloc =
             data.allocations.find((a) => a.status !== "FULL" && a.available > 0) ??
             data.allocations[0];
@@ -320,7 +322,7 @@ export default function EntryGatePage() {
       });
       setEntryReceipt({ ...data.session, qrImageUrl });
 
-      toast.success("Entry Allowed · Barrier Opened", {
+      toast.success("Vehicle entry recorded", {
         description: `${selectedCompany?.name || "Visitor"} · ${vehicleLabel} · ${availability.floorName}`,
       });
 
@@ -343,7 +345,7 @@ export default function EntryGatePage() {
     companies,
     vehicleNumber,
     vehicleLabel,
-    currentProject?.name,
+    currentProject,
     loadActiveSessions,
   ]);
 
@@ -1628,7 +1630,7 @@ export default function EntryGatePage() {
                   </div>
 
                   <div className="inline-block rounded-full bg-rose-100 border border-rose-200 px-3 py-1 text-xs font-bold text-rose-700">
-                    0 Slots Free · Barrier Locked
+                    0 Slots Free · Entry Unavailable
                   </div>
 
                   {/* Disabled Red Action Button */}

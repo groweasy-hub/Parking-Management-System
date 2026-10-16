@@ -6,6 +6,7 @@ export interface IUser extends Document {
   email: string;
   phone?: string;
   passwordHash: string;
+  sessionVersion: number;
   passwordResetTokenHash?: string;
   passwordResetExpiresAt?: Date;
   role: Role;
@@ -25,6 +26,7 @@ const userSchema = new Schema<IUser>(
     email: { type: String, required: true, trim: true, lowercase: true, unique: true },
     phone: { type: String, trim: true },
     passwordHash: { type: String, required: true, select: false },
+    sessionVersion: { type: Number, default: 0 },
     passwordResetTokenHash: { type: String, select: false },
     passwordResetExpiresAt: { type: Date, select: false },
     role: { type: String, enum: ROLES, required: true },

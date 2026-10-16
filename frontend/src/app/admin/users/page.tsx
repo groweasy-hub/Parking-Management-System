@@ -60,6 +60,8 @@ export default function UsersPage() {
     try {
       const u = await apiFetch<{ users: AppUser[] }>(`/api/users?projectId=${currentProjectId}`);
       setUsers(u.users);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to load users. Please try again.");
     } finally {
       setLoading(false);
     }

@@ -153,7 +153,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <Protected roles={DASHBOARD_ROLES}>
+    <Protected roles={ADMIN_NAV.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))?.roles ?? DASHBOARD_ROLES}>
       <div className="flex min-h-screen bg-slate-50/70 dark:bg-slate-950">
         {/* =================================================================== */}
         {/* DESKTOP SIDEBAR (Permanent on >= md screens)                         */}
@@ -255,7 +255,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         {/* MOBILE BOTTOM NAVIGATION BAR (< md screens)                         */}
         {/* =================================================================== */}
         <nav className="fixed bottom-0 inset-x-0 z-40 flex h-16 items-center justify-around border-t border-border/80 bg-background/95 px-1 backdrop-blur-xl md:hidden safe-bottom shadow-lg shadow-black/10">
-          {mobilePrimaryNav.map((item) => {
+          {mobilePrimaryNav.filter((item) => navItems.some((navItem) => navItem.href === item.href)).map((item) => {
             const active =
               pathname === item.href ||
               (item.href !== "/admin/dashboard" && pathname?.startsWith(item.href));

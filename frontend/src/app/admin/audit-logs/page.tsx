@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useProject } from "@/lib/project-context";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
+import { toast } from "sonner";
 import { AuditLogEntry } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,10 +38,14 @@ export default function AuditLogsPage() {
       );
       setLogs(data.logs);
       setTotal(data.total);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to load audit logs.");
     } finally {
       setLoading(false);
     }
   }, [currentProjectId, page]);
+
+  useEffect(() => { setPage(1); }, [currentProjectId]);
 
   useEffect(() => {
     load();

@@ -39,7 +39,7 @@ export function connectDB(): Promise<typeof mongoose> {
     try {
       return await mongoose.connect(baseUri, opts);
     } catch (err) {
-      if (process.env.NODE_ENV === "production") {
+      if (process.env.NODE_ENV === "production" || process.env.ALLOW_IN_MEMORY_DB !== "true") {
         throw err;
       }
 
@@ -67,13 +67,13 @@ export async function assertReplicaSet(): Promise<void> {
   try {
     const info = await admin.command({ isMaster: 1 });
     if (!info.setName) {
-      console.warn(
-        "[mongo] WARNING: MongoDB is not running as a replica set. " +
+      throw new Error(
+        "MongoDB is not running as a replica set. " +
           "Transactions and real-time change streams require a replica set " +
           "(use MongoDB Atlas, or `rs.initiate()` on a local single-node set).",
       );
     }
   } catch (err) {
-    console.warn("[mongo] Could not verify replica set status", err);
+    throw new Error("Could not verify MongoDB replica set support. Check the database configuration.", { cause: err });
   }
 }

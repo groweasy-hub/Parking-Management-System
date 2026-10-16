@@ -16,13 +16,15 @@ export const getSummary = asyncHandler(async (req: Request, res: Response) => {
   const projectId = requireProjectId(req);
 
   const occupancies = await Occupancy.find({ projectId }).lean();
-  const totalCapacity = occupancies.reduce((sum, o) => sum + o.capacity, 0);
+  const allocations = await ParkingAllocation.find({ projectId, status: "ACTIVE" }).lean();
+  const activeIds = new Set(allocations.map((allocation) => String(allocation._id)));
+  const totalCapacity = occupancies.filter((occupancy) => activeIds.has(String(occupancy.allocationId))).reduce((sum, o) => sum + o.capacity, 0);
   const totalOccupied = occupancies.reduce((sum, o) => sum + o.occupied, 0);
 
   res.json({
     totalCapacity,
     totalOccupied,
-    totalAvailable: totalCapacity - totalOccupied,
+    totalAvailable: Math.max(0, totalCapacity - totalOccupied),
     activeVehicles: totalOccupied,
   });
 });
