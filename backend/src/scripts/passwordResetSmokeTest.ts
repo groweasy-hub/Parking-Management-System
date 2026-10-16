@@ -17,15 +17,6 @@ async function close(server: http.Server) {
 
 async function main() {
   const database = await MongoMemoryServer.create({ instance: { launchTimeout: 60_000 } });
-  const deliveries: { email: string; resetLink: string }[] = [];
-  let failDelivery = false;
-  const mailServer = http.createServer(async (req, res) => {
-    let body = "";
-    for await (const chunk of req) body += chunk;
-    if (failDelivery) { res.writeHead(503).end(); return; }
-    deliveries.push(JSON.parse(body));
-    res.writeHead(202).end();
-  });
   let appServer: http.Server | undefined;
   try {
     process.env.MONGODB_URI = database.getUri();
@@ -33,14 +24,13 @@ async function main() {
     process.env.JWT_REFRESH_SECRET = "password-reset-test-refresh";
     process.env.NODE_ENV = "test";
     process.env.FRONTEND_URL = "http://localhost:3000";
-    process.env.PASSWORD_RESET_WEBHOOK_URL = await listen(mailServer);
+    process.env.PASSWORD_RESET_WEBHOOK_URL = "";
 
     const { connectDB } = await import("../config/db.js");
     const { createApp } = await import("../app.js");
     const { User } = await import("../models/index.js");
     const { hashPassword, comparePassword } = await import("../utils/password.js");
     const { passwordResetLimiter } = await import("../middleware/rateLimiters.js");
-    const { env } = await import("../config/env.js");
     await connectDB();
     const user = await User.create({
       name: "Reset Test", email: "reset@example.com", role: "SUPER_ADMIN",
@@ -55,13 +45,18 @@ async function main() {
     const post = (path: string, body: unknown) => fetch(`${base}/api/auth/${path}`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     });
-    const requestLink = () => post("forgot-password", { email: " RESET@EXAMPLE.COM " });
-    const latestToken = () => {
-      const link = new URL(deliveries.at(-1)!.resetLink);
-      assert.equal(link.origin, "http://localhost:3000");
-      assert.equal(link.pathname, "/reset-password");
-      return new URLSearchParams(link.hash.slice(1)).get("token")!;
+    let latestResetToken = "";
+    const checkEmail = async () => {
+      const response = await post("forgot-password", { email: " RESET@EXAMPLE.COM " });
+      if (response.status === 200) {
+        const body = await response.clone().json() as { resetToken: string };
+        assert.match(body.resetToken, /^[a-f0-9]{64}$/);
+        assert.equal(response.headers.get("cache-control"), "no-store");
+        latestResetToken = body.resetToken;
+      }
+      return response;
     };
+    const latestToken = () => latestResetToken;
     const reset = (token: string, newPassword = "Updated123!") => post("reset-password", { token, newPassword });
     const originalLogin = await post("login", { email: user.email, password: "Original123!" });
     const originalAuth = await originalLogin.json() as { accessToken: string };
@@ -70,9 +65,7 @@ async function main() {
     assert.equal((await post("forgot-password", { email: "wrong" })).status, 400);
     assert.equal((await post("forgot-password", { email: "missing@example.com" })).status, 404);
     assert.equal((await post("forgot-password", { email: "inactive@example.com" })).status, 404);
-    assert.equal(deliveries.length, 0);
-    assert.equal((await requestLink()).status, 200);
-    assert.equal(deliveries.at(-1)!.email, user.email);
+    assert.equal((await checkEmail()).status, 200);
     const firstToken = latestToken();
     const stored = await User.findById(user._id).select("+passwordResetTokenHash +passwordResetExpiresAt");
     assert.equal(stored!.passwordResetTokenHash, createHash("sha256").update(firstToken).digest("hex"));
@@ -80,15 +73,15 @@ async function main() {
     const publicUser = await User.findById(user._id).lean();
     assert(!("passwordResetTokenHash" in publicUser!));
     assert.equal((await reset(firstToken, "short")).status, 400);
-    assert.equal((await requestLink()).status, 200);
+    assert.equal((await checkEmail()).status, 200);
     const secondToken = latestToken();
     assert.notEqual(secondToken, firstToken);
     assert.equal((await reset(firstToken)).status, 400);
     const concurrent = await Promise.all([reset(secondToken), reset(secondToken)]);
     assert.deepEqual(concurrent.map((res) => res.status).sort(), [200, 400]);
     assert.equal((await reset(secondToken)).status, 400);
-    assert.equal((await requestLink()).status, 429);
-    console.log("PASS: email validation, delivery, token hashing, replacement, one-time use, concurrency, rate limiting");
+    assert.equal((await checkEmail()).status, 429);
+    console.log("PASS: database email check without email delivery, token hashing, replacement, one-time use, concurrency, rate limiting");
 
     // Isolate the remaining cases from the preceding rate-limit assertion.
     passwordResetLimiter.resetKey("127.0.0.1");
@@ -101,11 +94,11 @@ async function main() {
     assert.equal((await post("login", { email: user.email, password: "Original123!" })).status, 401);
     assert.equal((await post("login", { email: user.email, password: "Updated123!" })).status, 200);
 
-    assert.equal((await requestLink()).status, 200);
+    assert.equal((await checkEmail()).status, 200);
     const expiredToken = latestToken();
     await User.updateOne({ _id: user._id }, { $set: { passwordResetExpiresAt: new Date(Date.now() - 1000) } });
     assert.equal((await reset(expiredToken)).status, 400);
-    assert.equal((await requestLink()).status, 200);
+    assert.equal((await checkEmail()).status, 200);
     const pendingToken = latestToken();
     const currentLogin = await post("login", { email: user.email, password: "Updated123!" });
     const currentAuth = await currentLogin.json() as { accessToken: string };
@@ -116,16 +109,17 @@ async function main() {
     assert.equal(change.status, 200);
     assert.equal((await reset(pendingToken)).status, 400);
     console.log("PASS: changing a password invalidates outstanding reset links");
-    failDelivery = true;
-    assert.equal((await requestLink()).status, 503);
-    const afterFailure = await User.findById(user._id).select("+passwordResetTokenHash");
-    assert.equal(afterFailure!.passwordResetTokenHash, undefined);
-    Object.assign(env.notifications, { passwordResetWebhookUrl: "" });
-    assert.equal((await requestLink()).status, 503);
-    console.log("PASS: new-password login, old-password rejection, expiry, delivery failure, missing email configuration");
+    assert.equal((await checkEmail()).status, 200);
+    const disabledToken = latestToken();
+    await User.updateOne({ _id: user._id }, { $set: { status: "INACTIVE" } });
+    assert.equal((await reset(disabledToken)).status, 400);
+    const disabledUser = await User.findById(user._id).select("+passwordHash");
+    assert(await comparePassword("ChangedAgain123!", disabledUser!.passwordHash));
+    assert.equal((await reset("0".repeat(64))).status, 400);
+    console.log("PASS: new-password login, old-password rejection, expiry, inactive account protection, invalid token rejection");
+
   } finally {
     if (appServer) await close(appServer);
-    if (mailServer.listening) await close(mailServer);
     await mongoose.disconnect();
     await database.stop();
   }

@@ -1,5 +1,17 @@
 # Client handoff review - 16 October 2026
 
+## Subsequent password recovery requirement
+
+The user subsequently requested database email matching followed immediately by
+a new-password form, without an email link or code. This replaces the original
+inbox reset workflow described by the initial review. Email delivery settings are
+no longer required for password recovery. This intentionally does not prove
+ownership of the email address: knowing a registered email permits its password
+to be reset. Reassess that tradeoff before exposing the app publicly.
+
+The local backend's MongoDB DNS failure was reproduced and resolved with an
+explicit `DNS_SERVERS` override. Its health endpoint is available on port 4000.
+
 Automated validation passed. Deployment configuration and manual browser/device
 acceptance remain before calling the deployed application ready for the client.
 All database tests used temporary databases; client records were not modified.
@@ -61,8 +73,8 @@ The local `backend/.env` has database/JWT/CORS settings, but these are missing
 locally: `FRONTEND_URL`, `PASSWORD_RESET_WEBHOOK_URL`, and all `CLOUDINARY_*`
 settings. This review did not inspect the hosting provider's environment.
 
-1. Configure the real frontend URL and an email webhook that delivers the supplied
-   reset link. Verify delivery to an actual inbox and complete one password reset.
+1. Confirm the chosen email-only recovery behavior with the client and complete
+   one password reset using a registered email on the deployed application.
 2. Configure Cloudinary for persistent logo storage on ephemeral hosting, or use a
    deliberately provisioned persistent disk. Local filesystem fallback alone is
    not persistent on hosts that replace their filesystem on redeployment.

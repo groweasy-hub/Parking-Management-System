@@ -89,29 +89,23 @@ npm run build && npm start   # production build
 This is the fastest way to confirm the concurrency guarantees hold on your machine without
 provisioning Atlas first.
 
-### Password reset emails
+### Password reset by registered email
 
-The login page links to **Forgot password?**. Users enter their registered email,
-receive a reset link, then enter and confirm a new password. Unknown or inactive
-accounts display an email error. Links expire after 15 minutes and work once;
-requesting a new link invalidates the previous one. Only a hash of the token is
-stored in MongoDB.
+The login page links to **Forgot password?**. Enter a registered work email and
+select **Check email**. If it belongs to an active account, the same page displays
+**New password** and **Confirm new password**. Saving updates the hashed password
+and invalidates previous sessions. Unknown/inactive emails show an error.
 
-Set these values in `backend/.env` (and your backend hosting environment):
+This flow intentionally checks database membership only, as requested. It does
+not prove email ownership: anyone who knows a registered address can reset that
+account. An email delivery service, OTP, and email reset link are not required.
+The temporary reset session expires after 15 minutes, works once, and is replaced
+by a new email check. Only its token hash is stored in the database.
 
-```dotenv
-FRONTEND_URL=http://localhost:3000
-PASSWORD_RESET_WEBHOOK_URL=https://your-email-service.example/password-reset
-```
-
-`FRONTEND_URL` must be your actual frontend address in production. The webhook
-receives a JSON POST with `{ "email": "recipient@example.com", "resetLink": "..." }`
-and must send that link to the recipient using your email provider. It must return
-a successful HTTP status after accepting the email. The reset token is in the URL
-fragment; preserve the full link in the email. The application shows a delivery
-error if the webhook is missing, fails, or times out; it does not claim an email
-was sent. Run `npm run smoke-test:password-reset` in `backend/` to test the flow
-with a local fake email service and a temporary database.
+Run `npm run smoke-test:password-reset` in `backend/` for the integration tests.
+If MongoDB Atlas cannot resolve through the system DNS server, configure the
+optional `DNS_SERVERS` setting described in `backend/.env.example` and restart
+the backend. Keep `NEXT_PUBLIC_API_URL` pointed at the running backend.
 
 ## Frontend setup
 
@@ -147,7 +141,7 @@ See [HANDOFF_REVIEW.md](HANDOFF_REVIEW.md) for verified checks and remaining acc
    become available and attendance counts the successful operations.
 6. Verify reports for today's full business day, history filters, and CSV export.
 7. In Settings, reconcile occupancy. Verify corrections and audit log entries.
-8. Complete a real inbox password reset after configuring the email webhook.
+8. Check a registered email, set a new password, and confirm sign-in with it.
 
 The database connection now fails explicitly if the configured database cannot
 be reached. For disposable local development only, set `ALLOW_IN_MEMORY_DB=true`

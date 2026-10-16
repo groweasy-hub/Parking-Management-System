@@ -8,7 +8,6 @@ import { hashPassword } from "../utils/password";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
 import { env, isProduction } from "../config/env";
 import { recordAudit } from "../services/auditService";
-import { sendPasswordResetEmail } from "../services/emailService";
 import { disconnectUserSessions } from "../realtime/socketServer";
 import { sanitizeEmail, sanitizeHumanName, sanitizePassword, sanitizePhone } from "../utils/sanitize";
 import {
@@ -48,7 +47,7 @@ export const changePasswordSchema = z.object({
 export const forgotPasswordSchema = loginSchema.pick({ email: true });
 
 export const resetPasswordSchema = z.object({
-  token: z.string().regex(/^[a-f0-9]{64}$/, "This reset link is invalid. Please request a new one."),
+  token: z.string().regex(/^[a-f0-9]{64}$/, "Your reset session is invalid. Please check your email address again."),
   newPassword: changePasswordSchema.shape.newPassword,
 });
 
@@ -61,23 +60,15 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response) =
 
   const token = randomBytes(32).toString("hex");
   const tokenHash = createHash("sha256").update(token).digest("hex");
-  // Always use the configured frontend address, never a caller-provided host.
-  const resetLink = new URL("/reset-password", env.notifications.frontendUrl);
-  resetLink.hash = new URLSearchParams({ token }).toString();
   await User.updateOne({ _id: user._id }, { $set: {
     passwordResetTokenHash: tokenHash,
     passwordResetExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
   } });
 
-  try {
-    await sendPasswordResetEmail(user.email, resetLink.toString());
-  } catch (error) {
-    await User.updateOne({ _id: user._id, passwordResetTokenHash: tokenHash }, {
-      $unset: { passwordResetTokenHash: 1, passwordResetExpiresAt: 1 },
-    });
-    throw error;
-  }
-  res.json({ message: "A password reset link has been sent to your email. It expires in 15 minutes." });
+  // Product requirement: matching an active registered email permits recovery.
+  // This token limits the checked-email session; it does not prove inbox ownership.
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ message: "Email address found. You can now create a new password.", resetToken: token });
 });
 
 export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
@@ -95,7 +86,7 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
     $unset: { passwordResetTokenHash: 1, passwordResetExpiresAt: 1 },
   }, { new: true });
   if (!user) {
-    throw AppError.badRequest("This reset link is invalid or expired. Please request a new one.", "INVALID_RESET_TOKEN");
+    throw AppError.badRequest("Your reset session is invalid or expired. Please check your email address again.", "INVALID_RESET_TOKEN");
   }
   clearFailedLogin(user.email);
   disconnectUserSessions(String(user._id));

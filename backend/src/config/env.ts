@@ -40,6 +40,7 @@ export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   timeZone: process.env.APP_TIMEZONE ?? "Asia/Kolkata",
   port: Number(process.env.PORT ?? 4000),
+  dnsServers: (process.env.DNS_SERVERS ?? "").split(",").map((server) => server.trim()).filter(Boolean),
   mongodbUri: required("MONGODB_URI"),
   jwt: {
     accessSecret: required("JWT_ACCESS_SECRET"),

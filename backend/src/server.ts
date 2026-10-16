@@ -8,6 +8,8 @@ import { env } from "./config/env";
 import { connectDB, assertReplicaSet } from "./config/db";
 import { initSocketServer } from "./realtime/socketServer";
 
+if (env.dnsServers.length > 0) dns.setServers(env.dnsServers);
+
 async function main() {
   await connectDB();
   await assertReplicaSet();

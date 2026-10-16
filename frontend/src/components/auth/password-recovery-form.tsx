@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export function PasswordRecoveryForm({ mode }: { mode: "request" | "reset" }) {
-  const isReset = mode === "reset";
+  const [resetToken, setResetToken] = useState<string | null>(null);
+  const isReset = mode === "reset" || Boolean(resetToken);
   const { logout } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,14 +30,14 @@ export function PasswordRecoveryForm({ mode }: { mode: "request" | "reset" }) {
       setError("Passwords do not match. Please enter the same password in both fields.");
       return;
     }
-    const token = isReset ? new URLSearchParams(window.location.hash.slice(1)).get("token") : null;
+    const token = isReset ? resetToken ?? new URLSearchParams(window.location.hash.slice(1)).get("token") : null;
     if (isReset && !token) {
-      setError("This reset link is invalid. Please request a new one using the link below.");
+      setError("Your reset session is invalid. Please check your email address again using the link below.");
       return;
     }
     setSubmitting(true);
     try {
-      const result = await apiFetch<{ message: string }>(
+      const result = await apiFetch<{ message: string; resetToken?: string }>(
         `/api/auth/${isReset ? "reset-password" : "forgot-password"}`,
         {
           method: "POST",
@@ -51,9 +52,13 @@ export function PasswordRecoveryForm({ mode }: { mode: "request" | "reset" }) {
         setPassword("");
         setConfirmation("");
         setCompleted(true);
+        setResetToken(null);
+      } else {
+        if (!result.resetToken) throw new Error("Missing reset session");
+        setResetToken(result.resetToken);
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Unable to connect. Please try again.");
+      setError(err instanceof ApiError ? err.message : "Cannot connect to ParkFlow. Check your connection and try again, or contact your administrator.");
     } finally {
       setSubmitting(false);
     }
@@ -67,11 +72,13 @@ export function PasswordRecoveryForm({ mode }: { mode: "request" | "reset" }) {
             <ParkingSquare className="h-7 w-7" aria-hidden="true" />
           </div>
           <p className="text-sm font-bold text-muted-foreground">ParkFlow</p>
-          <h1 className="text-2xl font-black tracking-tight">{isReset ? "Create a new password" : "Forgot password?"}</h1>
+          <h1 className="text-2xl font-black tracking-tight">{completed ? "Password updated" : isReset ? "Create a new password" : "Forgot password?"}</h1>
           <p className="text-sm text-muted-foreground">
-            {isReset
-              ? "Choose a new password for your account. Your email link is valid for 15 minutes and can be used once."
-              : "Enter your registered work email. We will check your account and email you a link to create a new password."}
+            {completed
+              ? "Sign in to your account using your new password."
+              : isReset
+                ? "Your email matches an active account. Enter and confirm your new password below."
+                : "Enter your registered work email. If it matches an active account, you can create a new password."}
           </p>
         </div>
 
@@ -90,6 +97,7 @@ export function PasswordRecoveryForm({ mode }: { mode: "request" | "reset" }) {
           <form onSubmit={handleSubmit} className="space-y-4">
             {isReset ? (
               <>
+                {email && <p className="text-sm text-muted-foreground">Account: <span className="font-semibold text-foreground">{email.trim().toLowerCase()}</span></p>}
                 <div className="space-y-1.5">
                   <Label htmlFor="new-password">New password</Label>
                   <Input id="new-password" type="password" autoComplete="new-password" required
@@ -114,12 +122,16 @@ export function PasswordRecoveryForm({ mode }: { mode: "request" | "reset" }) {
             )}
             <Button type="submit" disabled={submitting} className="h-12 w-full rounded-xl font-bold">
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-              {submitting ? (isReset ? "Updating password..." : "Sending email...") : (isReset ? "Save new password" : "Send reset link")}
+              {submitting ? (isReset ? "Updating password..." : "Checking email...") : (isReset ? "Save new password" : "Check email")}
             </Button>
           </form>
         )}
         <div className="flex flex-col items-center gap-3 text-sm font-semibold text-primary">
-          {isReset && !completed && <Link href="/forgot-password" className="hover:underline">Request a new reset link</Link>}
+          {isReset && !completed && (resetToken
+            ? <button type="button" disabled={submitting} className="hover:underline" onClick={() => {
+                setResetToken(null); setPassword(""); setConfirmation(""); setError(null); setMessage(null);
+              }}>Use a different email</button>
+            : <Link href="/forgot-password" className="hover:underline">Check your email address again</Link>)}
           <Link href="/login" className="hover:underline">Back to sign in</Link>
         </div>
       </div>
