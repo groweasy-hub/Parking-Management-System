@@ -18,6 +18,16 @@ export function sanitizePhone(input: string): string {
   return stripHtml(input).replace(/[^\d+\-\s()]/g, "").replace(/\s+/g, " ").trim();
 }
 
+export function phoneLookupPattern(input: string): string | null {
+  const digits = input.replace(/\D/g, "");
+  if (digits.length < 7) return null;
+  return `^\\+?\\D*${digits.split("").join("\\D*")}\\D*$`;
+}
+
+export function phoneDigits(input: string): string {
+  return input.replace(/\D/g, "");
+}
+
 export function sanitizePassword(input: string): string {
   return stripHtml(input).replace(/[\u0000-\u001f\u007f]/g, "");
 }

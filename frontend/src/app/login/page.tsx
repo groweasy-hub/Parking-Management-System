@@ -25,7 +25,7 @@ import {
 export default function LoginPage() {
   const { user, loading, login } = useAuth();
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const loggedInUser = await login(email, password);
+      const loggedInUser = await login(identifier, password);
       router.replace(gatekeeperSecurityPath(loggedInUser) ?? landingPathForRole(loggedInUser.role));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unable to sign in. Please try again.");
@@ -118,16 +118,17 @@ export default function LoginPage() {
             )}
 
             <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-xs font-bold">Work Email</Label>
+              <Label htmlFor="email" className="text-xs font-bold">Work Email or Mobile Number</Label>
               <Input
                 id="email"
-                type="email"
+                type="text"
                 autoComplete="username"
                 required
+                inputMode="text"
                 className="h-12 rounded-xl border-2 bg-card text-sm font-medium text-foreground placeholder:text-muted-foreground"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="operator@parking.local"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="name@company.com or +91 98765 43210"
               />
             </div>
 

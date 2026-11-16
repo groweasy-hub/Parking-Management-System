@@ -3,6 +3,7 @@ import multer from "multer";
 import {
   createCompany,
   createCompanySchema,
+  deleteCompany,
   listCompanies,
   updateCompany,
   updateCompanySchema,
@@ -29,6 +30,7 @@ router.use(authenticate);
 router.get("/", listCompanies);
 router.post("/", requireRole("SUPER_ADMIN", "PROJECT_ADMIN"), validate(createCompanySchema), createCompany);
 router.patch("/:id", requireRole("SUPER_ADMIN", "PROJECT_ADMIN"), validate(updateCompanySchema), updateCompany);
+router.delete("/:id", requireRole("SUPER_ADMIN", "PROJECT_ADMIN"), deleteCompany);
 router.post(
   "/:id/logo",
   requireRole("SUPER_ADMIN", "PROJECT_ADMIN"),

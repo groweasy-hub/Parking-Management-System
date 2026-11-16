@@ -9,7 +9,7 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/
 import { env, isProduction } from "../config/env";
 import { recordAudit } from "../services/auditService";
 import { disconnectUserSessions } from "../realtime/socketServer";
-import { sanitizeEmail, sanitizeHumanName, sanitizePassword, sanitizePhone } from "../utils/sanitize";
+import { phoneDigits, phoneLookupPattern, sanitizeEmail, sanitizeHumanName, sanitizePassword, sanitizePhone } from "../utils/sanitize";
 import {
   applyProgressiveDelay,
   clearFailedLogin,
@@ -18,14 +18,21 @@ import {
   verifyPasswordAndGetMigrationHash,
 } from "../services/authSecurityService";
 
-const GENERIC_LOGIN_ERROR = "Incorrect email or password";
+const GENERIC_LOGIN_ERROR = "Incorrect work email, mobile number, or password.";
 const GENERIC_PASSWORD_CHANGE_ERROR = "Unable to change password.";
 const GENERIC_PROFILE_UPDATE_ERROR = "Unable to update profile.";
 
 export const loginSchema = z.object({
   email: z.preprocess(
-    (value) => (typeof value === "string" ? sanitizeEmail(value) : value),
-    z.string().min(5).max(254).email()
+    (value) => {
+      if (typeof value !== "string") return value;
+      return value.includes("@") ? sanitizeEmail(value) : sanitizePhone(value);
+    },
+    z.string().min(5).max(254).refine((value) => {
+      if (value.includes("@")) return z.string().email().safeParse(value).success;
+      const digits = phoneDigits(value);
+      return digits.length >= 7 && digits.length <= 20;
+    }, "Enter a valid work email or mobile number.")
   ),
   password: z.preprocess(
     (value) => (typeof value === "string" ? sanitizePassword(value) : value),
@@ -44,7 +51,12 @@ export const changePasswordSchema = z.object({
   ),
 });
 
-export const forgotPasswordSchema = loginSchema.pick({ email: true });
+export const forgotPasswordSchema = z.object({
+  email: z.preprocess(
+    (value) => (typeof value === "string" ? sanitizeEmail(value) : value),
+    z.string().min(5).max(254).email()
+  ),
+});
 
 export const resetPasswordSchema = z.object({
   token: z.string().regex(/^[a-f0-9]{64}$/, "Your reset session is invalid. Please check your email address again."),
@@ -193,27 +205,38 @@ function serializeAuthUser(user: {
 }
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
-  const { email, password } = req.body as z.infer<typeof loginSchema>;
-  const normalizedEmail = email.toLowerCase();
+  const { email: identifier, password } = req.body as z.infer<typeof loginSchema>;
+  const isEmail = identifier.includes("@");
+  const identifierKey = isEmail ? identifier.toLowerCase() : `phone:${phoneDigits(identifier)}`;
+  const phonePattern = isEmail ? null : phoneLookupPattern(identifier);
+  let user = isEmail
+    ? await User.findOne({ email: identifier.toLowerCase() }).select("+passwordHash")
+    : null;
 
-  if (isAccountLocked(normalizedEmail)) {
-    await applyProgressiveDelay(normalizedEmail);
+  if (!isEmail && phonePattern) {
+    const matches = await User.find({ phone: { $regex: phonePattern }, status: "ACTIVE" }).select("+passwordHash").limit(2);
+    // Refuse ambiguous phone numbers rather than choosing an account arbitrarily.
+    if (matches.length === 1) user = matches[0];
+  }
+
+  const attemptKeys = user ? [identifierKey, `user:${String(user._id)}`] : [identifierKey];
+  if (attemptKeys.some(isAccountLocked)) {
+    await Promise.all(attemptKeys.map(applyProgressiveDelay));
     throw AppError.unauthorized(GENERIC_LOGIN_ERROR, "INVALID_CREDENTIALS");
   }
 
-  const user = await User.findOne({ email: normalizedEmail }).select("+passwordHash");
   if (!user || user.status !== "ACTIVE") {
-    await recordFailedLogin(normalizedEmail);
+    await Promise.all(attemptKeys.map(recordFailedLogin));
     throw AppError.unauthorized(GENERIC_LOGIN_ERROR, "INVALID_CREDENTIALS");
   }
 
   const { valid, migrationHash } = await verifyPasswordAndGetMigrationHash(password, user.passwordHash);
   if (!valid) {
-    await recordFailedLogin(normalizedEmail);
+    await Promise.all(attemptKeys.map(recordFailedLogin));
     throw AppError.unauthorized(GENERIC_LOGIN_ERROR, "INVALID_CREDENTIALS");
   }
 
-  clearFailedLogin(normalizedEmail);
+  attemptKeys.forEach(clearFailedLogin);
   if (migrationHash) {
     user.passwordHash = migrationHash;
   }
@@ -337,6 +360,17 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
     }
     user.passwordResetTokenHash = undefined;
     user.passwordResetExpiresAt = undefined;
+  }
+
+  if (data.phone && phoneDigits(data.phone) !== phoneDigits(user.phone ?? "")) {
+    const digits = phoneDigits(data.phone);
+    const phonePattern = phoneLookupPattern(data.phone);
+    const duplicate = phonePattern
+      ? await User.exists({ phone: { $regex: phonePattern }, _id: { $ne: user._id } })
+      : null;
+    if (digits.length < 7 || digits.length > 20 || duplicate) {
+      throw AppError.badRequest(GENERIC_PROFILE_UPDATE_ERROR, "PROFILE_UPDATE_FAILED");
+    }
   }
 
   if (data.newPassword) {

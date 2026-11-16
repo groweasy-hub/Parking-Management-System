@@ -34,7 +34,7 @@ export function markMpinUnlocked(userId: string) {
 }
 
 export function gatekeeperSecurityPath(user: AuthUser) {
-  if (user.role !== "GATEKEEPER") return null;
+  if (user.role !== "GATEKEEPER" && user.role !== "SECURITY_SUPERVISOR") return null;
   if (user.mustChangePassword) return "/gate/security";
   if (!hasMpinForUser(user.id)) return "/gate/security";
   if (!isMpinUnlocked(user.id)) return "/gate/security";

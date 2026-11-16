@@ -73,7 +73,7 @@ export default function GateLayout({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (user?.role === "GATEKEEPER") loadTodayDuty();
+    if (user?.role === "GATEKEEPER" || user?.role === "SECURITY_SUPERVISOR") loadTodayDuty();
   }, [loadTodayDuty, user?.role, pathname]);
 
   useProjectRealtime(currentProjectId, {
@@ -101,7 +101,7 @@ export default function GateLayout({ children }: { children: ReactNode }) {
   }, [isSecurity, router, user]);
 
   return (
-    <Protected roles={["GATEKEEPER"]}>
+    <Protected roles={["GATEKEEPER", "SECURITY_SUPERVISOR"]}>
       <div className="flex min-h-screen flex-col bg-[#eef3f8] text-slate-950 dark:bg-slate-950 dark:text-slate-50">
         {/* Simple, Modern, Clean Gate App Bar */}
         <header className="sticky top-0 z-30 flex h-[76px] min-w-0 items-center justify-between border-b border-slate-200/80 bg-white/95 px-4 shadow-sm shadow-slate-200/60 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/95 dark:shadow-none sm:h-14 sm:px-6">

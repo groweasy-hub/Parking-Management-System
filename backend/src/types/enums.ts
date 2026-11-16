@@ -2,9 +2,14 @@ export const ROLES = [
   "SUPER_ADMIN",
   "PROJECT_ADMIN",
   "GATEKEEPER",
+  "SECURITY_SUPERVISOR",
   "VIEWER",
 ] as const;
 export type Role = (typeof ROLES)[number];
+
+export function isGateOperator(role: Role): boolean {
+  return role === "GATEKEEPER" || role === "SECURITY_SUPERVISOR";
+}
 
 export const VEHICLE_TYPES = ["CAR", "BIKE", "OTHER"] as const;
 export type VehicleType = (typeof VEHICLE_TYPES)[number];

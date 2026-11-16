@@ -4,11 +4,11 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
 import { Project, User } from "../models";
 import { disconnectUserSessions } from "../realtime/socketServer";
-import { ROLES } from "../types/enums";
+import { isGateOperator, ROLES } from "../types/enums";
 import { ensureProjectAccess } from "../middleware/auth";
 import { recordAudit } from "../services/auditService";
 import { hashPassword } from "../utils/password";
-import { sanitizeEmail, sanitizeHumanName, sanitizePassword, sanitizePhone } from "../utils/sanitize";
+import { phoneDigits, phoneLookupPattern, sanitizeEmail, sanitizeHumanName, sanitizePassword, sanitizePhone } from "../utils/sanitize";
 
 const GENERIC_REGISTRATION_ERROR = "Unable to complete registration.";
 
@@ -57,7 +57,22 @@ export const updateUserSchema = z.object({
   ),
 });
 
-const PROJECT_ADMIN_CREATABLE_ROLES = ["GATEKEEPER", "VIEWER"];
+const PROJECT_ADMIN_CREATABLE_ROLES = ["GATEKEEPER", "SECURITY_SUPERVISOR", "VIEWER"];
+
+async function ensureUniqueLoginPhone(phone: string | undefined, excludeUserId?: string) {
+  if (!phone) return;
+  const digits = phoneDigits(phone);
+  if (digits.length < 7 || digits.length > 20) {
+    throw AppError.badRequest("Enter a valid mobile number with 7 to 20 digits.", "INVALID_PHONE");
+  }
+  const pattern = phoneLookupPattern(phone);
+  if (!pattern) return;
+  const filter: Record<string, unknown> = { phone: { $regex: pattern } };
+  if (excludeUserId) filter._id = { $ne: excludeUserId };
+  if (await User.exists(filter)) {
+    throw AppError.conflict("This mobile number is already assigned to another account.", "PHONE_ALREADY_IN_USE");
+  }
+}
 
 export const listUsers = asyncHandler(async (req: Request, res: Response) => {
   const requester = req.user!;
@@ -80,7 +95,7 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
 
   if (requester.role === "PROJECT_ADMIN") {
     if (!PROJECT_ADMIN_CREATABLE_ROLES.includes(data.role)) {
-      throw AppError.forbidden("Project admins can only create gate or viewer users.");
+      throw AppError.forbidden("Project admins can only create gate, security supervisor, or viewer users.");
     }
     data.projectId = requester.projectId;
   }
@@ -92,6 +107,7 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
   if (data.role !== "SUPER_ADMIN" && !await Project.exists({ _id: data.projectId, status: "ACTIVE" })) {
     throw AppError.badRequest("Please select an active project.");
   }
+  await ensureUniqueLoginPhone(data.phone);
 
   const existing = await User.findOne({ email: data.email.toLowerCase() }).lean();
   if (existing) throw AppError.conflict(GENERIC_REGISTRATION_ERROR, "REGISTRATION_FAILED");
@@ -104,7 +120,7 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
     passwordHash,
     role: data.role,
     customRoleLabel: data.customRoleLabel,
-    mustChangePassword: data.role === "GATEKEEPER",
+    mustChangePassword: isGateOperator(data.role),
     projectId: data.role === "SUPER_ADMIN" ? null : data.projectId,
     gateId: null,
     status: "ACTIVE",
@@ -143,7 +159,10 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
 
   const data = req.body as z.infer<typeof updateUserSchema>;
   if (requester.role === "PROJECT_ADMIN" && !PROJECT_ADMIN_CREATABLE_ROLES.includes(existing.role)) {
-    throw AppError.forbidden("Project admins can only update gate or viewer users.");
+    throw AppError.forbidden("Project admins can only update gate, security supervisor, or viewer users.");
+  }
+  if (data.phone !== undefined && phoneDigits(data.phone) !== phoneDigits(existing.phone ?? "")) {
+    await ensureUniqueLoginPhone(data.phone, String(existing._id));
   }
   if (requester.id === String(existing._id) && data.status === "INACTIVE") {
     throw AppError.badRequest("You cannot deactivate your own account.");
@@ -154,7 +173,7 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
   if (data.status !== undefined) existing.status = data.status;
   if (data.password) {
     existing.passwordHash = await hashPassword(data.password);
-    existing.mustChangePassword = existing.role === "GATEKEEPER";
+    existing.mustChangePassword = isGateOperator(existing.role);
     existing.passwordResetTokenHash = undefined;
     existing.passwordResetExpiresAt = undefined;
   }

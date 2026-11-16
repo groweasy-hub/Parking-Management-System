@@ -2,6 +2,7 @@ export const ROLES = [
   "SUPER_ADMIN",
   "PROJECT_ADMIN",
   "GATEKEEPER",
+  "SECURITY_SUPERVISOR",
   "VIEWER",
 ] as const;
 export type Role = (typeof ROLES)[number];
@@ -53,7 +54,9 @@ export interface Company {
   projectId: string;
   name: string;
   code: string;
-  /** The building floor the company's office is on — NOT a parking floor. */
+  /** Building floors the company's office occupies, not parking floors. */
+  officeFloors?: string[];
+  /** Legacy first-floor field for older API records. */
   officeFloor?: string;
   email?: string;
   phone?: string;

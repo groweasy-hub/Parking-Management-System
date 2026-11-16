@@ -8,7 +8,7 @@ import { AuthUser } from "./types";
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<AuthUser>;
+  login: (identifier: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -55,10 +55,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("parkflow:session-expired", expire);
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (identifier: string, password: string) => {
     const data = await apiFetch<{ accessToken?: string; user: AuthUser }>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email: identifier, password }),
     });
     if (data.accessToken) setAccessToken(data.accessToken);
     disconnectSocket();

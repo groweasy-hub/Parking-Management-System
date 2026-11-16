@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader } from "@/components/page-header";
-import { Plus, Building2, Trash2, Loader2, AlertTriangle, MapPin, CheckCircle2, Layers, DoorOpen, Users, Car } from "lucide-react";
+import { Plus, Building2, Trash2, Loader2, AlertTriangle, MapPin, CheckCircle2, Layers, DoorOpen, Users, Car, Bike } from "lucide-react";
 
 type ProjectDetails = {
   floors: Floor[];
@@ -43,6 +43,10 @@ export default function ProjectsPage() {
   const [detailsProject, setDetailsProject] = useState<Project | null>(null);
   const [details, setDetails] = useState<ProjectDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [editingFloorCapacity, setEditingFloorCapacity] = useState<Floor | null>(null);
+  const [floorCarCapacity, setFloorCarCapacity] = useState("0");
+  const [floorBikeCapacity, setFloorBikeCapacity] = useState("0");
+  const [savingFloorCapacity, setSavingFloorCapacity] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -113,6 +117,39 @@ export default function ProjectsPage() {
       toast.error(err instanceof ApiError ? err.message : "Unable to delete project.");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  function manageFloorCapacity(floor: Floor) {
+    setEditingFloorCapacity(floor);
+    setFloorCarCapacity(String(floor.carCapacity ?? 0));
+    setFloorBikeCapacity(String(floor.bikeCapacity ?? 0));
+  }
+
+  async function saveFloorCapacity() {
+    if (!editingFloorCapacity) return;
+    const carCapacity = Number(floorCarCapacity);
+    const bikeCapacity = Number(floorBikeCapacity);
+    if (!Number.isInteger(carCapacity) || carCapacity < 0 || !Number.isInteger(bikeCapacity) || bikeCapacity < 0) {
+      toast.error("Enter whole numbers of zero or more for car and bike spaces.");
+      return;
+    }
+
+    setSavingFloorCapacity(true);
+    try {
+      const data = await apiFetch<{ floor: Floor }>(`/api/floors/${editingFloorCapacity._id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ carCapacity, bikeCapacity }),
+      });
+      setDetails((current) => current
+        ? { ...current, floors: current.floors.map((floor) => floor._id === data.floor._id ? data.floor : floor) }
+        : current);
+      setEditingFloorCapacity(null);
+      toast.success("Parking floor capacity updated.");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to update parking floor capacity.");
+    } finally {
+      setSavingFloorCapacity(false);
     }
   }
 
@@ -272,11 +309,17 @@ export default function ProjectsPage() {
                       <EmptyDetail text="No parking floors added." />
                     ) : (
                       details.floors.map((floor) => (
-                        <RowDetail
-                          key={floor._id}
-                          title={`${floor.name} (${floor.code})`}
-                          meta={`Cars ${floor.carCapacity ?? 0} | Bikes ${floor.bikeCapacity ?? 0} | ${floor.status}`}
-                        />
+                        <div key={floor._id} className="flex items-center justify-between gap-3 rounded-xl border bg-background px-3 py-2.5">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold">{floor.name} ({floor.code})</p>
+                            <p className="text-xs text-muted-foreground">
+                              Cars {floor.carCapacity ?? 0} · Bikes {floor.bikeCapacity ?? 0} · Total {(floor.carCapacity ?? 0) + (floor.bikeCapacity ?? 0)} · {floor.status}
+                            </p>
+                          </div>
+                          <Button type="button" size="sm" variant="outline" onClick={() => manageFloorCapacity(floor)}>
+                            Manage Parking Space
+                          </Button>
+                        </div>
                       ))
                     )}
                   </DetailSection>
@@ -299,7 +342,7 @@ export default function ProjectsPage() {
                         <RowDetail
                           key={company._id}
                           title={company.name}
-                          meta={`${company.code}${company.officeFloor ? ` | Floor ${company.officeFloor}` : ""}${company.serviceType ? ` | ${company.serviceType}` : ""}`}
+                          meta={`${company.code}${(company.officeFloors?.length ? company.officeFloors : company.officeFloor ? [company.officeFloor] : []).map((floor) => ` | Floor ${floor}`).join("")}${company.serviceType ? ` | ${company.serviceType}` : ""}`}
                         />
                       ))
                     )}
@@ -336,6 +379,39 @@ export default function ProjectsPage() {
               ) : null}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingFloorCapacity} onOpenChange={(open) => !open && setEditingFloorCapacity(null)}>
+        <DialogContent className="rounded-2xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Manage Parking Space</DialogTitle>
+            <DialogDescription>
+              {editingFloorCapacity?.name} ({editingFloorCapacity?.code}): set the total car and bike capacity for this floor.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="project-floor-car-capacity" className="flex items-center gap-1.5 text-xs font-bold"><Car className="h-3.5 w-3.5" /> Car Spaces</Label>
+                <Input id="project-floor-car-capacity" type="number" min={0} step={1} value={floorCarCapacity} onChange={(event) => setFloorCarCapacity(event.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="project-floor-bike-capacity" className="flex items-center gap-1.5 text-xs font-bold"><Bike className="h-3.5 w-3.5" /> Bike Spaces</Label>
+                <Input id="project-floor-bike-capacity" type="number" min={0} step={1} value={floorBikeCapacity} onChange={(event) => setFloorBikeCapacity(event.target.value)} />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Combined parking capacity: {(Number(floorCarCapacity) || 0) + (Number(floorBikeCapacity) || 0)} spaces.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setEditingFloorCapacity(null)}>Cancel</Button>
+            <Button type="button" disabled={savingFloorCapacity} onClick={saveFloorCapacity}>
+              {savingFloorCapacity && <Loader2 className="h-4 w-4 animate-spin" />}
+              Save Capacity
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

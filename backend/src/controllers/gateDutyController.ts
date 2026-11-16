@@ -6,6 +6,7 @@ import { Gate, GateDuty } from "../models";
 import { ensureProjectAccess } from "../middleware/auth";
 import { recordAudit } from "../services/auditService";
 import { businessDateKey } from "../utils/dates";
+import { isGateOperator } from "../types/enums";
 
 function todayKey(date = new Date()) {
   return businessDateKey(date);
@@ -22,7 +23,7 @@ export const attendanceQuerySchema = z.object({
 });
 
 export const getTodayDuty = asyncHandler(async (req: Request, res: Response) => {
-  if (req.user!.role !== "GATEKEEPER") throw AppError.forbidden();
+  if (!isGateOperator(req.user!.role)) throw AppError.forbidden();
 
   const duty = await GateDuty.findOne({ userId: req.user!.id, dutyDate: todayKey() })
     .populate("gateId", "name type")
@@ -32,7 +33,7 @@ export const getTodayDuty = asyncHandler(async (req: Request, res: Response) => 
 });
 
 export const startGateDuty = asyncHandler(async (req: Request, res: Response) => {
-  if (req.user!.role !== "GATEKEEPER") throw AppError.forbidden();
+  if (!isGateOperator(req.user!.role)) throw AppError.forbidden();
   const data = req.body as z.infer<typeof startGateDutySchema>;
   ensureProjectAccess(req.user!, data.projectId);
 
@@ -73,7 +74,7 @@ export const startGateDuty = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const endGateDuty = asyncHandler(async (req: Request, res: Response) => {
-  if (req.user!.role !== "GATEKEEPER") throw AppError.forbidden();
+  if (!isGateOperator(req.user!.role)) throw AppError.forbidden();
   const duty = await GateDuty.findOneAndUpdate(
     { userId: req.user!.id, dutyDate: todayKey(), endedAt: null },
     { $set: { endedAt: new Date() } },

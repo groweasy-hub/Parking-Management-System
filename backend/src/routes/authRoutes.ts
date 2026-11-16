@@ -14,7 +14,7 @@ router.post(
   "/login",
   loginLimiter,
   validate(loginSchema, "body", {
-    genericMessage: "Incorrect email or password",
+    genericMessage: "Incorrect work email, mobile number, or password.",
     genericCode: "INVALID_CREDENTIALS",
     logLabel: "auth.login",
   }),

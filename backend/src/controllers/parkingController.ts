@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { z } from "zod";
+import { isGateOperator } from "../types/enums";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
 import { Company, GateDuty, Project } from "../models";
@@ -108,7 +109,7 @@ export const createEntryHandler = asyncHandler(async (req: Request, res: Respons
   const data = req.body as z.infer<typeof entrySchema>;
   ensureProjectAccess(req.user!, data.projectId);
 
-  if (req.user!.role !== "GATEKEEPER") {
+  if (!isGateOperator(req.user!.role)) {
     throw AppError.forbidden("Only entry gate staff can record vehicle entries.");
   }
   const duty = await GateDuty.findOne({ userId: req.user!.id, dutyDate: businessDateKey(), endedAt: null }).lean();
@@ -135,7 +136,7 @@ export const createEntryHandler = asyncHandler(async (req: Request, res: Respons
 export const createExitHandler = asyncHandler(async (req: Request, res: Response) => {
   const data = req.body as z.infer<typeof exitSchema>;
 
-  if (req.user!.role !== "GATEKEEPER") {
+  if (!isGateOperator(req.user!.role)) {
     throw AppError.forbidden("Only exit gate staff can record vehicle exits.");
   }
   const duty = await GateDuty.findOne({ userId: req.user!.id, dutyDate: businessDateKey(), endedAt: null }).lean();

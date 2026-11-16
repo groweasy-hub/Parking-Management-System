@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { useProject } from "@/lib/project-context";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -12,14 +12,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/page-header";
-import { Bike, Building2, Car, Loader2, Mail, Phone, Plus, Search, Wrench } from "lucide-react";
+import { Bike, Building2, Car, Loader2, Mail, Phone, Plus, Search, Trash2, Wrench } from "lucide-react";
 
 type CompanyForm = {
   name: string;
-  officeFloor: string;
+  officeFloors: string[];
   email: string;
   phone: string;
   serviceType: string;
@@ -32,9 +33,22 @@ type AllocationDraft = {
   bikeCapacity: number;
 };
 
+type CompanyEditDraft = {
+  name: string;
+  officeFloors: string[];
+  email: string;
+  phone: string;
+  serviceType: string;
+  address: string;
+};
+
+function emptyAllocationDraft(): AllocationDraft {
+  return { floorId: "", carCapacity: 0, bikeCapacity: 0 };
+}
+
 const emptyCompany: CompanyForm = {
   name: "",
-  officeFloor: "",
+  officeFloors: [],
   email: "",
   phone: "",
   serviceType: "",
@@ -53,16 +67,24 @@ export default function CompaniesPage() {
   const [detailsCompany, setDetailsCompany] = useState<Company | null>(null);
   const [companyAllocations, setCompanyAllocations] = useState<ParkingAllocation[]>([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const [allocation, setAllocation] = useState<AllocationDraft>({
-    floorId: "",
-    carCapacity: 0,
-    bikeCapacity: 0,
-  });
+  const [allocationDrafts, setAllocationDrafts] = useState<AllocationDraft[]>([emptyAllocationDraft()]);
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [savingCompanyAllocations, setSavingCompanyAllocations] = useState(false);
+  const [editingCompanyDetails, setEditingCompanyDetails] = useState<Company | null>(null);
+  const [companyEditDraft, setCompanyEditDraft] = useState<CompanyEditDraft | null>(null);
+  const [savingCompanyDetails, setSavingCompanyDetails] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Company | null>(null);
+  const [deleteConfirmCode, setDeleteConfirmCode] = useState("");
+  const [deletingCompany, setDeletingCompany] = useState(false);
 
   const form = useForm<CompanyForm>({ defaultValues: emptyCompany });
-  const officeFloor = useWatch({ control: form.control, name: "officeFloor" });
+  const officeFloors = form.watch("officeFloors");
 
   const buildingFloorOptions = Array.from({ length: currentProject?.totalFloors ?? 0 }, (_, index) => String(index + 1));
+  const floorOrderedCompanies = [...companies].sort((left, right) => {
+    const floorDifference = firstOfficeFloorNumber(left) - firstOfficeFloorNumber(right);
+    return floorDifference || left.name.localeCompare(right.name);
+  });
 
   const load = useCallback(async () => {
     if (!currentProjectId) return;
@@ -89,19 +111,22 @@ export default function CompaniesPage() {
   function resetDialog() {
     form.reset({ ...emptyCompany, address: currentProject?.address ?? "" });
     setCreatedCompany(null);
-    setAllocation({ floorId: "", carCapacity: 0, bikeCapacity: 0 });
+    setAllocationDrafts([emptyAllocationDraft()]);
   }
 
   async function createCompany(values: CompanyForm) {
-    if (!currentProjectId) return;
+    if (!currentProjectId) {
+      toast.error("Select a project before registering a company.");
+      return;
+    }
     setSubmitting(true);
     try {
       const data = await apiFetch<{ company: Company }>("/api/companies", {
         method: "POST",
         body: JSON.stringify({
           projectId: currentProjectId,
-          name: values.name,
-          officeFloor: values.officeFloor,
+          name: values.name.trim(),
+          officeFloors: values.officeFloors,
           email: values.email || undefined,
           phone: values.phone || undefined,
           serviceType: values.serviceType || undefined,
@@ -118,33 +143,68 @@ export default function CompaniesPage() {
     }
   }
 
-  async function createAllocation(vehicleType: VehicleType, capacity: number) {
-    if (!currentProjectId || !createdCompany || !allocation.floorId || capacity <= 0) return;
-    const data = await apiFetch<{ allocations: ParkingAllocation[] }>(
-      `/api/parking-allocations?projectId=${currentProjectId}&companyId=${createdCompany._id}`
+  async function persistCompanyAllocations(
+    company: Company,
+    drafts: AllocationDraft[]
+  ) {
+    if (!currentProjectId) throw new Error("Select a project before changing parking allocations.");
+    const response = await apiFetch<{ allocations: ParkingAllocation[] }>(
+      `/api/parking-allocations?projectId=${currentProjectId}&companyId=${company._id}`
     );
-    const existing = data.allocations.find((item) => item.floorId === allocation.floorId && item.vehicleType === vehicleType);
-    await apiFetch(existing ? `/api/parking-allocations/${existing._id}` : "/api/parking-allocations", {
-      method: existing ? "PATCH" : "POST",
-      body: JSON.stringify({
-        projectId: currentProjectId,
-        companyId: createdCompany._id,
-        floorId: allocation.floorId,
-        vehicleType,
-        capacity,
-      }),
-    });
+    const existingAllocations = response.allocations;
+
+    for (const draft of drafts) {
+      for (const vehicleType of ["CAR", "BIKE"] as const) {
+        const capacity = Math.max(0, Math.floor(Number(vehicleType === "CAR" ? draft.carCapacity : draft.bikeCapacity) || 0));
+        const existing = existingAllocations.find(
+          (item) => item.floorId === draft.floorId && item.vehicleType === vehicleType
+        );
+
+        if (existing) {
+          if (capacity > 0) {
+            await apiFetch(`/api/parking-allocations/${existing._id}`, {
+              method: "PATCH",
+              body: JSON.stringify({ capacity, status: "ACTIVE" }),
+            });
+            existing.capacity = capacity;
+            existing.status = "ACTIVE";
+          } else if (existing.status === "ACTIVE") {
+            await apiFetch(`/api/parking-allocations/${existing._id}`, {
+              method: "PATCH",
+              body: JSON.stringify({ status: "INACTIVE" }),
+            });
+            existing.status = "INACTIVE";
+          }
+        } else if (capacity > 0) {
+          const created = await apiFetch<{ allocation: ParkingAllocation }>("/api/parking-allocations", {
+            method: "POST",
+            body: JSON.stringify({
+              projectId: currentProjectId,
+              companyId: company._id,
+              floorId: draft.floorId,
+              vehicleType,
+              capacity,
+            }),
+          });
+          existingAllocations.push(created.allocation);
+        }
+      }
+    }
   }
 
   async function saveAllocation() {
-    if (!allocation.floorId || (Number(allocation.carCapacity) <= 0 && Number(allocation.bikeCapacity) <= 0)) {
-      toast.error("Select a parking floor and allocate at least one space.");
+    const configured = allocationDrafts.filter((draft) => draft.floorId && (Number(draft.carCapacity) > 0 || Number(draft.bikeCapacity) > 0));
+    if (!createdCompany || configured.length === 0) {
+      toast.error("Choose at least one parking floor and enter a car or bike capacity.");
+      return;
+    }
+    if (new Set(allocationDrafts.filter((draft) => draft.floorId).map((draft) => draft.floorId)).size !== allocationDrafts.filter((draft) => draft.floorId).length) {
+      toast.error("Choose each parking floor only once.");
       return;
     }
     setSubmitting(true);
     try {
-      await createAllocation("CAR", Number(allocation.carCapacity) || 0);
-      await createAllocation("BIKE", Number(allocation.bikeCapacity) || 0);
+      await persistCompanyAllocations(createdCompany, configured);
       toast.success("Parking allocation saved.");
       setOpen(false);
       resetDialog();
@@ -153,6 +213,103 @@ export default function CompaniesPage() {
       toast.error(err instanceof ApiError ? err.message : "Unable to allocate parking.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  function beginEditAllocations(company: Company) {
+    const byFloor = new Map<string, AllocationDraft>();
+    for (const item of companyAllocations) {
+      const draft = byFloor.get(item.floorId) ?? { ...emptyAllocationDraft(), floorId: item.floorId };
+      const capacity = item.status === "ACTIVE" ? item.capacity : 0;
+      if (item.vehicleType === "CAR") draft.carCapacity = capacity;
+      if (item.vehicleType === "BIKE") draft.bikeCapacity = capacity;
+      byFloor.set(item.floorId, draft);
+    }
+    setEditingCompany(company);
+    setAllocationDrafts([...byFloor.values(), emptyAllocationDraft()]);
+  }
+
+  async function saveEditedAllocations() {
+    if (!editingCompany) return;
+    const selectedFloors = allocationDrafts.filter((draft) => draft.floorId);
+    if (new Set(selectedFloors.map((draft) => draft.floorId)).size !== selectedFloors.length) {
+      toast.error("Choose each parking floor only once.");
+      return;
+    }
+    setSavingCompanyAllocations(true);
+    try {
+      await persistCompanyAllocations(editingCompany, selectedFloors);
+      toast.success("Company parking allocations updated.");
+      setEditingCompany(null);
+      await openCompanyDetails(editingCompany);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to update parking allocations.");
+    } finally {
+      setSavingCompanyAllocations(false);
+    }
+  }
+
+  function updateAllocationDraft(index: number, changes: Partial<AllocationDraft>) {
+    setAllocationDrafts((current) => current.map((draft, draftIndex) => draftIndex === index ? { ...draft, ...changes } : draft));
+  }
+
+  function beginEditCompany(company: Company) {
+    setEditingCompanyDetails(company);
+    setCompanyEditDraft({
+      name: company.name,
+      officeFloors: company.officeFloors?.length ? company.officeFloors : company.officeFloor ? [company.officeFloor] : [],
+      email: company.email ?? "",
+      phone: company.phone ?? "",
+      serviceType: company.serviceType ?? "",
+      address: company.address ?? "",
+    });
+  }
+
+  async function saveCompanyDetails() {
+    if (!editingCompanyDetails || !companyEditDraft) return;
+    if (!companyEditDraft.name.trim()) {
+      toast.error("Company name is required.");
+      return;
+    }
+    setSavingCompanyDetails(true);
+    try {
+      const data = await apiFetch<{ company: Company }>(`/api/companies/${editingCompanyDetails._id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: companyEditDraft.name.trim(),
+          officeFloors: companyEditDraft.officeFloors,
+          email: companyEditDraft.email,
+          phone: companyEditDraft.phone,
+          serviceType: companyEditDraft.serviceType,
+          address: companyEditDraft.address,
+        }),
+      });
+      setCompanies((current) => current.map((company) => company._id === data.company._id ? data.company : company));
+      setDetailsCompany(data.company);
+      setEditingCompanyDetails(null);
+      toast.success("Company details updated.");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to update company details.");
+    } finally {
+      setSavingCompanyDetails(false);
+    }
+  }
+
+  async function deleteCompany() {
+    if (!deleteTarget || deleteConfirmCode !== deleteTarget.code) return;
+    setDeletingCompany(true);
+    try {
+      await apiFetch(`/api/companies/${deleteTarget._id}`, { method: "DELETE" });
+      setCompanies((current) => current.filter((company) => company._id !== deleteTarget._id));
+      setDetailsCompany(null);
+      setCompanyAllocations([]);
+      setDeleteTarget(null);
+      setDeleteConfirmCode("");
+      toast.success(`${deleteTarget.name} was deleted.`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to delete company.");
+    } finally {
+      setDeletingCompany(false);
     }
   }
 
@@ -193,22 +350,58 @@ export default function CompaniesPage() {
               </DialogHeader>
 
               {!createdCompany ? (
-                <form onSubmit={form.handleSubmit(createCompany)} className="grid gap-4 sm:grid-cols-2">
+                <form
+                  noValidate
+                  onSubmit={form.handleSubmit(createCompany, () => {
+                    toast.error("Enter a company name and correct any highlighted fields.");
+                  })}
+                  className="grid gap-4 sm:grid-cols-2"
+                >
                   <Field label="Company Name">
-                    <Input {...form.register("name", { required: true })} placeholder="Example: ABC Technologies" />
+                    <Input
+                      {...form.register("name", {
+                        validate: (value) => value.trim().length > 0 || "Company name is required.",
+                      })}
+                      aria-invalid={!!form.formState.errors.name}
+                      aria-describedby={form.formState.errors.name ? "company-name-error" : undefined}
+                      placeholder="Example: ABC Technologies"
+                    />
+                    {form.formState.errors.name && (
+                      <p id="company-name-error" className="text-xs font-medium text-destructive" role="alert">
+                        {form.formState.errors.name.message}
+                      </p>
+                    )}
                   </Field>
-                  <Field label="Company Floor">
-                    <Select value={officeFloor} onValueChange={(value) => form.setValue("officeFloor", value ?? "")}>
-                      <SelectTrigger><SelectValue placeholder="Select building floor" /></SelectTrigger>
-                      <SelectContent>
-                        {buildingFloorOptions.map((floor) => (
-                          <SelectItem key={floor} value={floor}>Floor {floor}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <Field label="Company Office Floors (Optional — select all that apply)">
+                    {buildingFloorOptions.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-2 rounded-xl border p-3 sm:grid-cols-3">
+                        {buildingFloorOptions.map((floor) => {
+                          const selected = (officeFloors ?? []).includes(floor);
+                          return (
+                            <label key={floor} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-muted/50">
+                              <Checkbox
+                                checked={selected}
+                                onCheckedChange={(checked) => {
+                                  const next = checked
+                                    ? [...(officeFloors ?? []), floor]
+                                    : (officeFloors ?? []).filter((item) => item !== floor);
+                                  form.setValue("officeFloors", next, { shouldDirty: true, shouldTouch: true });
+                                }}
+                              />
+                              <span>Floor {floor}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="rounded-xl border border-dashed p-3 text-xs text-muted-foreground">No building floors configured for this project.</p>
+                    )}
                   </Field>
                   <Field label="Email Address Optional">
-                    <Input type="email" {...form.register("email")} placeholder="admin@company.com" />
+                    <Input type="email" {...form.register("email", {
+                      pattern: { value: /^$|^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Enter a valid email address." },
+                    })} aria-invalid={!!form.formState.errors.email} placeholder="admin@company.com" />
+                    {form.formState.errors.email && <p className="text-xs font-medium text-destructive" role="alert">{form.formState.errors.email.message}</p>}
                   </Field>
                   <Field label="Contact Number Optional">
                     <Input {...form.register("phone")} placeholder="+91..." />
@@ -219,7 +412,7 @@ export default function CompaniesPage() {
                   <Field label="Address">
                     <Textarea {...form.register("address")} placeholder={currentProject?.address || "Building address"} />
                   </Field>
-                  <Button disabled={submitting} className="sm:col-span-2 font-bold">
+                  <Button type="submit" disabled={submitting} className="sm:col-span-2 font-bold">
                     {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                     Register Company
                   </Button>
@@ -228,28 +421,35 @@ export default function CompaniesPage() {
                 <div className="space-y-4">
                   <div className="rounded-xl border bg-muted/20 p-3">
                     <p className="font-bold">{createdCompany.name}</p>
-                    <p className="text-xs text-muted-foreground">Code: {createdCompany.code}</p>
+                    <p className="text-xs text-muted-foreground">Code: {createdCompany.code} · Add parking on one or more floors.</p>
                   </div>
-                  <Field label="Parking Floor">
-                    <Select value={allocation.floorId} onValueChange={(value) => setAllocation((current) => ({ ...current, floorId: value ?? "" }))}>
-                      <SelectTrigger><SelectValue placeholder="Select parking floor" /></SelectTrigger>
-                      <SelectContent>
-                        {floors.map((floor) => (
-                          <SelectItem key={floor._id} value={floor._id}>
-                            {floor.name} ({floor.code}) | Cars {floor.carCapacity} | Bikes {floor.bikeCapacity}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <CapacityField icon={Car} label="Car Spaces" value={allocation.carCapacity} onChange={(value) => setAllocation((current) => ({ ...current, carCapacity: value }))} />
-                    <CapacityField icon={Bike} label="Bike Spaces" value={allocation.bikeCapacity} onChange={(value) => setAllocation((current) => ({ ...current, bikeCapacity: value }))} />
+                  <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1">
+                    {allocationDrafts.map((draft, index) => (
+                      <AllocationFloorDraft
+                        key={index}
+                        index={index}
+                        draft={draft}
+                        floors={floors}
+                        floorDisabled={false}
+                        unavailableFloorIds={new Set(allocationDrafts.filter((_, draftIndex) => draftIndex !== index).map((item) => item.floorId).filter(Boolean))}
+                        onChange={(changes) => updateAllocationDraft(index, changes)}
+                      />
+                    ))}
                   </div>
-                  <Button disabled={submitting || !allocation.floorId} onClick={saveAllocation} className="w-full font-bold">
-                    {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Save Parking Allocation
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={allocationDrafts.some((draft) => !draft.floorId) || allocationDrafts.filter((draft) => draft.floorId).length >= floors.length}
+                    onClick={() => setAllocationDrafts((current) => [...current, emptyAllocationDraft()])}
+                    className="w-full"
+                  >
+                    <Plus className="h-4 w-4" /> Add Another Floor
                   </Button>
+                  <Button disabled={submitting || floors.length === 0} onClick={saveAllocation} className="w-full font-bold">
+                    {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Save Company and Parking
+                  </Button>
+                  {floors.length === 0 && <p className="text-center text-xs text-muted-foreground">Add parking floors to this project before assigning spaces.</p>}
                 </div>
               )}
             </DialogContent>
@@ -268,7 +468,7 @@ export default function CompaniesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
-          {companies.map((company) => (
+          {floorOrderedCompanies.map((company) => (
             <Card
               key={company._id}
               onClick={() => openCompanyDetails(company)}
@@ -284,7 +484,7 @@ export default function CompaniesPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-2 text-xs text-muted-foreground">
-                {company.officeFloor && <Info icon={Building2} text={`Floor ${company.officeFloor}`} />}
+                {companyOfficeFloorLabel(company) && <Info icon={Building2} text={companyOfficeFloorLabel(company)} />}
                 {company.email && <Info icon={Mail} text={company.email} />}
                 {company.phone && <Info icon={Phone} text={company.phone} />}
                 {company.serviceType && <Info icon={Wrench} text={company.serviceType} />}
@@ -314,12 +514,28 @@ export default function CompaniesPage() {
           {detailsCompany && (
             <div className="space-y-5">
               <div className="grid gap-3 sm:grid-cols-2">
-                <DetailItem label="Building Floor" value={detailsCompany.officeFloor ? `Floor ${detailsCompany.officeFloor}` : "Not added"} />
+                <div className="rounded-2xl border bg-muted/20 p-3">
+                  <p className="text-[11px] font-bold uppercase text-muted-foreground">Building Floors</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <p className="text-sm font-bold text-foreground">{companyOfficeFloorLabel(detailsCompany) || "Not added"}</p>
+                  </div>
+                </div>
                 <DetailItem label="Status" value={detailsCompany.status} />
                 <DetailItem label="Email" value={detailsCompany.email || "Not added"} />
                 <DetailItem label="Contact Number" value={detailsCompany.phone || "Not added"} />
                 <DetailItem label="Service Type" value={detailsCompany.serviceType || "Not added"} />
                 <DetailItem label="Address" value={detailsCompany.address || currentProject?.address || "Not added"} />
+              </div>
+
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => beginEditCompany(detailsCompany)}>Edit Company</Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => { setDeleteTarget(detailsCompany); setDeleteConfirmCode(""); }}
+                >
+                  <Trash2 className="h-4 w-4" /> Delete Company
+                </Button>
               </div>
 
               {detailsLoading ? (
@@ -337,7 +553,12 @@ export default function CompaniesPage() {
                   </div>
 
                   <section className="space-y-2">
-                    <h3 className="text-sm font-black">Parking Allocations</h3>
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-sm font-black">Parking Allocations</h3>
+                      <Button type="button" size="sm" variant="outline" onClick={() => beginEditAllocations(detailsCompany)}>
+                        Edit Floors & Spaces
+                      </Button>
+                    </div>
                     {companyAllocations.length === 0 ? (
                       <div className="rounded-xl border border-dashed bg-muted/20 px-3 py-4 text-center text-xs font-semibold text-muted-foreground">
                         No parking allocations added for this company.
@@ -346,7 +567,8 @@ export default function CompaniesPage() {
                       <div className="space-y-2">
                         {companyAllocations.map((item) => {
                           const floor = floors.find((floorItem) => floorItem._id === item.floorId);
-                          const available = Math.max(0, item.capacity - (item.occupied ?? 0));
+                          const capacity = item.status === "ACTIVE" ? item.capacity : 0;
+                          const available = Math.max(0, capacity - (item.occupied ?? 0));
                           const Icon = item.vehicleType === "BIKE" ? Bike : Car;
                           return (
                             <div key={item._id} className="rounded-2xl border bg-background p-3">
@@ -365,7 +587,7 @@ export default function CompaniesPage() {
                                 </Badge>
                               </div>
                               <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                                <MiniMetric label="Capacity" value={item.capacity} />
+                                <MiniMetric label="Capacity" value={capacity} />
                                 <MiniMetric label="Occupied" value={item.occupied ?? 0} />
                                 <MiniMetric label="Available" value={available} />
                               </div>
@@ -381,6 +603,167 @@ export default function CompaniesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!editingCompany} onOpenChange={(value) => { if (!value) setEditingCompany(null); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Parking Allocations</DialogTitle>
+            <DialogDescription>{editingCompany?.name}: set car and bike spaces on each parking floor.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {allocationDrafts.map((draft, index) => (
+              <AllocationFloorDraft
+                key={index}
+                index={index}
+                draft={draft}
+                floors={floors}
+                floorDisabled={companyAllocations.some((item) => item.floorId === draft.floorId)}
+                unavailableFloorIds={new Set(allocationDrafts.filter((_, draftIndex) => draftIndex !== index).map((item) => item.floorId).filter(Boolean))}
+                onChange={(changes) => updateAllocationDraft(index, changes)}
+              />
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={allocationDrafts.some((draft) => !draft.floorId) || allocationDrafts.filter((draft) => draft.floorId).length >= floors.length}
+              onClick={() => setAllocationDrafts((current) => [...current, emptyAllocationDraft()])}
+              className="w-full"
+            >
+              <Plus className="h-4 w-4" /> Add Another Floor
+            </Button>
+            <Button disabled={savingCompanyAllocations} onClick={saveEditedAllocations} className="w-full font-bold">
+              {savingCompanyAllocations && <Loader2 className="h-4 w-4 animate-spin" />}
+              Save Parking Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingCompanyDetails} onOpenChange={(value) => { if (!value) setEditingCompanyDetails(null); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Company</DialogTitle>
+            <DialogDescription>Update company details and select every building floor it occupies.</DialogDescription>
+          </DialogHeader>
+          {companyEditDraft && (
+            <div className="space-y-4">
+              <Field label="Company Name">
+                <Input value={companyEditDraft.name} onChange={(event) => setCompanyEditDraft((current) => current ? { ...current, name: event.target.value } : current)} />
+              </Field>
+              <Field label="Company Office Floors (select all that apply)">
+                {buildingFloorOptions.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2 rounded-xl border p-3 sm:grid-cols-3">
+                    {buildingFloorOptions.map((floor) => (
+                      <label key={floor} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-muted/50">
+                        <Checkbox
+                          checked={companyEditDraft.officeFloors.includes(floor)}
+                          onCheckedChange={(checked) => setCompanyEditDraft((current) => current ? {
+                            ...current,
+                            officeFloors: checked
+                              ? current.officeFloors.includes(floor) ? current.officeFloors : [...current.officeFloors, floor]
+                              : current.officeFloors.filter((item) => item !== floor),
+                          } : current)}
+                        />
+                        <span>Floor {floor}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-xl border border-dashed p-3 text-xs text-muted-foreground">No building floors configured for this project.</p>
+                )}
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Email">
+                  <Input type="email" value={companyEditDraft.email} onChange={(event) => setCompanyEditDraft((current) => current ? { ...current, email: event.target.value } : current)} />
+                </Field>
+                <Field label="Contact Number">
+                  <Input value={companyEditDraft.phone} onChange={(event) => setCompanyEditDraft((current) => current ? { ...current, phone: event.target.value } : current)} />
+                </Field>
+                <Field label="Service Type">
+                  <Input value={companyEditDraft.serviceType} onChange={(event) => setCompanyEditDraft((current) => current ? { ...current, serviceType: event.target.value } : current)} />
+                </Field>
+                <Field label="Address">
+                  <Textarea value={companyEditDraft.address} onChange={(event) => setCompanyEditDraft((current) => current ? { ...current, address: event.target.value } : current)} />
+                </Field>
+              </div>
+              <Button disabled={savingCompanyDetails} onClick={saveCompanyDetails} className="w-full font-bold">
+                {savingCompanyDetails && <Loader2 className="h-4 w-4 animate-spin" />}
+                Save Company Changes
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(value) => { if (!value) { setDeleteTarget(null); setDeleteConfirmCode(""); } }}>
+        <DialogContent className="rounded-2xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Company</DialogTitle>
+            <DialogDescription>
+              This permanently removes {deleteTarget?.name}, its parking allocations, and its parking session history. Companies with vehicles still parked must have those vehicles exited first.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteTarget && (
+            <div className="space-y-2">
+              <Label htmlFor="delete-company-code" className="text-xs font-bold">
+                Type company code <span className="font-mono text-destructive">{deleteTarget.code}</span> to confirm.
+              </Label>
+              <Input
+                id="delete-company-code"
+                value={deleteConfirmCode}
+                onChange={(event) => setDeleteConfirmCode(event.target.value.toUpperCase())}
+                placeholder={deleteTarget.code}
+                className="font-mono uppercase"
+                autoFocus
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button type="button" variant="destructive" disabled={deletingCompany || !deleteTarget || deleteConfirmCode !== deleteTarget.code} onClick={deleteCompany}>
+              {deletingCompany && <Loader2 className="h-4 w-4 animate-spin" />}
+              Delete Company
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function AllocationFloorDraft({
+  index,
+  draft,
+  floors,
+  floorDisabled,
+  unavailableFloorIds,
+  onChange,
+}: {
+  index: number;
+  draft: AllocationDraft;
+  floors: Floor[];
+  floorDisabled: boolean;
+  unavailableFloorIds: Set<string>;
+  onChange: (changes: Partial<AllocationDraft>) => void;
+}) {
+  return (
+    <div className="space-y-3 rounded-xl border p-3">
+      <Field label={`Parking Floor ${index + 1}`}>
+        <Select value={draft.floorId || null} onValueChange={(value) => onChange({ floorId: value ?? "" })}>
+          <SelectTrigger disabled={floorDisabled}><SelectValue placeholder="Select parking floor" /></SelectTrigger>
+          <SelectContent>
+            {floors.map((floor) => (
+              <SelectItem key={floor._id} value={floor._id} disabled={unavailableFloorIds.has(floor._id)}>
+                {floor.name} ({floor.code}) · Cars {floor.carCapacity} · Bikes {floor.bikeCapacity}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <CapacityField icon={Car} label="Car Spaces" value={draft.carCapacity} onChange={(value) => onChange({ carCapacity: value })} />
+        <CapacityField icon={Bike} label="Bike Spaces" value={draft.bikeCapacity} onChange={(value) => onChange({ bikeCapacity: value })} />
+      </div>
     </div>
   );
 }
@@ -398,7 +781,7 @@ function CapacityField({ icon: Icon, label, value, onChange }: { icon: typeof Ca
   return (
     <div className="space-y-1.5">
       <Label className="flex items-center gap-1.5 text-xs font-bold"><Icon className="h-3.5 w-3.5" /> {label}</Label>
-      <Input type="number" min={0} value={value} onChange={(event) => onChange(Number(event.target.value))} />
+        <Input type="number" min={0} step={1} value={value} onChange={(event) => onChange(Number(event.target.value))} />
     </div>
   );
 }
@@ -410,6 +793,27 @@ function Info({ icon: Icon, text }: { icon: typeof Building2; text: string }) {
       {text}
     </p>
   );
+}
+
+function companyOfficeFloorLabel(company: Company): string {
+  const floors = company.officeFloors?.length
+    ? company.officeFloors
+    : company.officeFloor
+      ? [company.officeFloor]
+      : [];
+  return floors.map((floor) => `Floor ${floor}`).join(", ");
+}
+
+function firstOfficeFloorNumber(company: Company): number {
+  const floors = company.officeFloors?.length
+    ? company.officeFloors
+    : company.officeFloor
+      ? [company.officeFloor]
+      : [];
+  const numbers = floors
+    .map((floor) => Number(floor.match(/\d+/)?.[0]))
+    .filter(Number.isFinite);
+  return numbers.length ? Math.min(...numbers) : Number.POSITIVE_INFINITY;
 }
 
 function DetailItem({ label, value }: { label: string; value: string }) {
@@ -446,6 +850,6 @@ function sumAllocation(
   field: "capacity" | "occupied"
 ) {
   return allocations
-    .filter((allocation) => allocation.vehicleType === vehicleType)
+    .filter((allocation) => allocation.vehicleType === vehicleType && allocation.status === "ACTIVE")
     .reduce((sum, allocation) => sum + (field === "capacity" ? allocation.capacity : allocation.occupied ?? 0), 0);
 }

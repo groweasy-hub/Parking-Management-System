@@ -5,7 +5,9 @@ export interface ICompany extends Document {
   projectId: Types.ObjectId;
   name: string;
   code: string;
-  /** The building floor the company's office occupies — NOT a parking floor. */
+  /** Building floors the company's office occupies — not parking floors. */
+  officeFloors?: string[];
+  /** Legacy first-floor field retained for older clients. */
   officeFloor?: string;
   email?: string;
   phone?: string;
@@ -23,6 +25,7 @@ const companySchema = new Schema<ICompany>(
     projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true },
     name: { type: String, required: true, trim: true },
     code: { type: String, required: true, trim: true, uppercase: true },
+    officeFloors: { type: [{ type: String, trim: true }], default: undefined },
     officeFloor: { type: String, trim: true },
     email: { type: String, trim: true, lowercase: true },
     phone: { type: String, trim: true },

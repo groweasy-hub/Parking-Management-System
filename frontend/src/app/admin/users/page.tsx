@@ -18,7 +18,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PageHeader } from "@/components/page-header";
 import { CalendarDays, ChevronLeft, ChevronRight, Eye, EyeOff, Plus, Loader2, Users } from "lucide-react";
 
-const CREATABLE_ROLES: Role[] = ["PROJECT_ADMIN", "GATEKEEPER", "VIEWER"];
+const CREATABLE_ROLES: Role[] = ["PROJECT_ADMIN", "GATEKEEPER", "SECURITY_SUPERVISOR", "VIEWER"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 type AttendanceDay = { date: string; worked: boolean; visited: boolean };
 type AttendanceSlideDirection = "previous" | "next";
@@ -27,6 +27,7 @@ type AttendanceSlidePhase = "idle" | "exit" | "enter";
 function roleLabel(role: Role, customRoleLabel?: string) {
   if (customRoleLabel) return customRoleLabel;
   if (role === "GATEKEEPER") return "Gate Keeper";
+  if (role === "SECURITY_SUPERVISOR") return "Security Supervisor";
   if (role === "PROJECT_ADMIN") return "Manager";
   if (role === "SUPER_ADMIN") return "Super Admin";
   if (role === "VIEWER") return "Other";
@@ -211,11 +212,12 @@ export default function UsersPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-bold">Contact Number</Label>
+                  <Label className="text-xs font-bold">Mobile Number (Optional Login)</Label>
                   <Input
+                    type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+91..."
+                    placeholder="+91 98765 43210"
                     className="h-11 rounded-xl font-medium"
                   />
                 </div>
@@ -350,7 +352,7 @@ export default function UsersPage() {
                           <Badge variant={u.status === "ACTIVE" ? "default" : "secondary"} className="text-[10px] font-bold">
                             {u.status}
                           </Badge>
-                          {u.role === "GATEKEEPER" && <CalendarDays className="h-4 w-4 text-muted-foreground" />}
+                          {(u.role === "GATEKEEPER" || u.role === "SECURITY_SUPERVISOR") && <CalendarDays className="h-4 w-4 text-muted-foreground" />}
                         </div>
                       </TableCell>
                     </TableRow>
