@@ -13,7 +13,7 @@ export function mpinUnlockedKey(userId: string) {
   return `${MPIN_UNLOCKED_PREFIX}${userId}`;
 }
 
-function todayKey() {
+function legacyTodayKey() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
@@ -25,12 +25,21 @@ export function hasMpinForUser(userId: string) {
 
 export function isMpinUnlocked(userId: string) {
   if (typeof window === "undefined") return false;
-  return window.sessionStorage.getItem(mpinUnlockedKey(userId)) === todayKey();
+  const key = mpinUnlockedKey(userId);
+  if (window.localStorage.getItem(key) === "true") return true;
+
+  // Carry forward a valid unlock from the previous per-day session marker.
+  const legacyMarker = window.sessionStorage.getItem(key);
+  if (legacyMarker && legacyMarker === legacyTodayKey()) {
+    window.localStorage.setItem(key, "true");
+    return true;
+  }
+  return false;
 }
 
 export function markMpinUnlocked(userId: string) {
   if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(mpinUnlockedKey(userId), todayKey());
+  window.localStorage.setItem(mpinUnlockedKey(userId), "true");
 }
 
 export function gatekeeperSecurityPath(user: AuthUser) {

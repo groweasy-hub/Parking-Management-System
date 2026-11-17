@@ -135,6 +135,10 @@ export default function EntryGatePage() {
     }
     return { car, bike, other };
   }, [sessions]);
+  const selectedCompanyVehicleCount = useMemo(() => sessions.filter((session) => {
+    const companyId = typeof session.companyId === "string" ? session.companyId : session.companyId._id;
+    return companyId === selectedCompany?._id && session.vehicleType === vehicleType;
+  }).length, [sessions, selectedCompany, vehicleType]);
 
   // Load entry gates
   useEffect(() => {
@@ -288,7 +292,7 @@ export default function EntryGatePage() {
 
   // Handle final entry submission (Barrier Open)
   const handleConfirmEntry = useCallback(async () => {
-    if (!currentProjectId || !vehicleType || !availability?.available || !selectedGateId) {
+    if (!currentProjectId || !vehicleType || (!availability?.available && vehicleType !== "BIKE") || !selectedGateId) {
       if (!selectedGateId) toast.error("Please select an entry gate lane.");
       return;
     }
@@ -965,9 +969,12 @@ export default function EntryGatePage() {
                   </div>
                   <span className="text-xs text-slate-400">Step 3 of 3</span>
                 </div>
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">
+                  {selectedCompany?.name || "Company"} {vehicleLabel.toLowerCase()}s parked inside: {selectedCompanyVehicleCount}
+                </div>
 
                 {/* GREEN CARD: PARKING SPACE AVAILABLE */}
-                {availability?.available ? (
+                {availability?.available || vehicleType === "BIKE" ? (
                   <div className="rounded-3xl border-2 border-emerald-400 bg-[#E8F5E9] dark:bg-emerald-950/40 p-6 text-center shadow-lg shadow-emerald-500/10 space-y-4">
                     <div className="flex justify-center pt-2">
                       <ParkingAvailableCenterIcon className="h-24 w-24 drop-shadow-sm" />
@@ -994,8 +1001,7 @@ export default function EntryGatePage() {
                     </div>
 
                     <div className="inline-block rounded-full bg-emerald-100 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-800">
-                      {availability.totalAvailable} Slot
-                      {availability.totalAvailable === 1 ? "" : "s"} Free
+                      {vehicleType === "BIKE" ? "Bike entry allowed, even when full" : <>{availability.totalAvailable} Slot{availability.totalAvailable === 1 ? "" : "s"} Free</>}
                     </div>
                   </div>
                 ) : (
@@ -1031,7 +1037,7 @@ export default function EntryGatePage() {
 
               {/* Bottom Actions */}
               <div className="fixed inset-x-0 bottom-0 z-20 space-y-2 border-t border-slate-200 bg-white/95 px-5 py-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-md safe-bottom dark:border-slate-800 dark:bg-slate-900/95">
-                {availability?.available ? (
+                {availability?.available || vehicleType === "BIKE" ? (
                   <button
                     type="button"
                     onClick={handleConfirmEntry}

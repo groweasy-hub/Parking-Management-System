@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useProject } from "@/lib/project-context";
 import { apiFetch, ApiError } from "@/lib/api";
 import { toast } from "sonner";
@@ -11,18 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AvailabilityBadge } from "@/components/availability-badge";
 import { PageHeader } from "@/components/page-header";
-import {
-  Loader2,
-  TrendingUp,
-  Clock,
-  Car,
-  Activity,
-  ArrowUpRight,
-  ArrowDownLeft,
-  Calendar,
-  Layers,
-  PieChart
-} from "lucide-react";
+import { Loader2, Car, Activity, ArrowUpRight, ArrowDownLeft, Calendar, Layers, PieChart } from "lucide-react";
 
 interface DayRow {
   date: string;
@@ -45,22 +34,14 @@ function isoDaysAgo(days: number) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function formatDuration(minutes: number) {
-  if (minutes < 60) return `${minutes} min`;
-  const hrs = Math.floor(minutes / 60);
-  const remainingMins = minutes % 60;
-  return `${hrs}h ${remainingMins}m`;
-}
-
 export default function ReportsPage() {
   const { currentProjectId } = useProject();
   const [from, setFrom] = useState(isoDaysAgo(7));
   const [to, setTo] = useState(isoDaysAgo(0));
+  const [period, setPeriod] = useState<"day" | "week" | "month" | "year">("day");
 
   const [days, setDays] = useState<DayRow[]>([]);
   const [utilization, setUtilization] = useState<UtilizationRow[]>([]);
-  const [peak, setPeak] = useState<{ peakOccupancy: number; peakTime: string | null } | null>(null);
-  const [avgDuration, setAvgDuration] = useState<{ averageDurationMinutes: number; sampledSessions: number } | null>(null);
   const [activeCount, setActiveCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -70,17 +51,13 @@ export default function ReportsPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ projectId: currentProjectId, from, to });
-      const [entriesExits, util, peakData, duration, active] = await Promise.all([
+      const [entriesExits, util, active] = await Promise.all([
         apiFetch<{ days: DayRow[] }>(`/api/reports/entries-exits?${params}`),
         apiFetch<{ rows: UtilizationRow[] }>(`/api/reports/utilization?projectId=${currentProjectId}`),
-        apiFetch<{ peakOccupancy: number; peakTime: string | null }>(`/api/reports/peak-occupancy?${params}`),
-        apiFetch<{ averageDurationMinutes: number; sampledSessions: number }>(`/api/reports/average-duration?${params}`),
         apiFetch<{ activeVehicles: number }>(`/api/reports/active-vehicles?projectId=${currentProjectId}`),
       ]);
       setDays(entriesExits.days);
       setUtilization(util.rows);
-      setPeak(peakData);
-      setAvgDuration(duration);
       setActiveCount(active.activeVehicles);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Unable to load reports.");
@@ -93,14 +70,44 @@ export default function ReportsPage() {
     load();
   }, [load]);
 
-  const totalEntries = days.reduce((acc, d) => acc + d.entries, 0);
-  const totalExits = days.reduce((acc, d) => acc + d.exits, 0);
+  const reportRows = useMemo(() => {
+    const grouped = new Map<string, DayRow>();
+    for (const row of days) {
+      const date = new Date(`${row.date}T00:00:00`);
+      let key = row.date;
+      if (period === "week") {
+        date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+        key = `Week of ${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      } else if (period === "month") key = row.date.slice(0, 7);
+      else if (period === "year") key = row.date.slice(0, 4);
+      const current = grouped.get(key) ?? { date: key, entries: 0, exits: 0 };
+      current.entries += row.entries;
+      current.exits += row.exits;
+      grouped.set(key, current);
+    }
+    return [...grouped.values()];
+  }, [days, period]);
+  const totalEntries = reportRows.reduce((acc, d) => acc + d.entries, 0);
+  const totalExits = reportRows.reduce((acc, d) => acc + d.exits, 0);
+  const barMax = Math.max(1, ...reportRows.flatMap((row) => [row.entries, row.exits]));
+  const vehicleTotals = ["CAR", "BIKE", "OTHER"].map((type) => ({
+    type,
+    count: utilization.filter((row) => row.vehicleType === type).reduce((sum, row) => sum + row.occupied, 0),
+  }));
+  const vehicleTotal = vehicleTotals.reduce((sum, item) => sum + item.count, 0);
+  const pieColors = ["#2563eb", "#10b981", "#f59e0b"];
+  let piePosition = 0;
+  const pieStops = vehicleTotals.map((item, index) => {
+    const start = piePosition;
+    piePosition += vehicleTotal ? (item.count / vehicleTotal) * 100 : 0;
+    return `${pieColors[index]} ${start}% ${piePosition}%`;
+  }).join(", ");
 
   return (
     <div className="space-y-6 pb-8">
       <PageHeader
-        title="Analytics & Reports"
-        description="Real-time occupancy metrics, vehicle turnover rates, and parking allocation utilization."
+        title="Parking Reports"
+        description="Vehicle entries, exits, and what is parked right now."
       />
 
       {/* Date Range Selector Bar */}
@@ -169,98 +176,74 @@ export default function ReportsPage() {
               />
             </div>
             {loading && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+            <select aria-label="Report period" value={period} onChange={(event) => {
+              const nextPeriod = event.target.value as typeof period;
+              setPeriod(nextPeriod);
+              const now = new Date();
+              const start = new Date(now);
+              if (nextPeriod === "day") start.setHours(0, 0, 0, 0);
+              if (nextPeriod === "week") start.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+              if (nextPeriod === "month") start.setDate(1);
+              if (nextPeriod === "year") { start.setMonth(0, 1); }
+              setFrom(`${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`);
+              setTo(isoDaysAgo(0));
+            }} className="h-8 rounded-lg border border-input bg-background px-2 text-xs">
+              <option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="year">Yearly</option>
+            </select>
           </div>
         </CardContent>
       </Card>
 
-      {/* KPI Stats Cards */}
-      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
-        <Card className="border border-border/80 bg-gradient-to-br from-card to-card/60 shadow-xs">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Active Now</span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                <Car className="h-4 w-4" />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <SummaryCard title="Vehicles entered" value={totalEntries} caption="During the selected dates" color="text-blue-700" />
+        <SummaryCard title="Vehicles exited" value={totalExits} caption="During the selected dates" color="text-amber-700" />
+        <SummaryCard title="Parked right now" value={activeCount ?? 0} caption="Currently inside the parking area" color="text-emerald-700" />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+        <Card>
+          <CardHeader><CardTitle>Vehicles in and out</CardTitle><CardDescription>Compare entries and exits for each {period}.</CardDescription></CardHeader>
+          <CardContent>
+            {reportRows.length === 0 ? <p className="py-12 text-center text-sm text-muted-foreground">No vehicle movement in this date range.</p> : (
+              <div className="flex min-h-56 items-end gap-3 overflow-x-auto border-b border-border px-2 pt-4">
+                {reportRows.map((row) => (
+                  <div key={row.date} className="flex min-w-12 flex-1 flex-col items-center gap-2">
+                    <div className="flex h-40 w-full items-end justify-center gap-1.5">
+                      <div title={`${row.entries} entered`} className="w-3.5 rounded-t bg-blue-600" style={{ height: `${Math.max(row.entries ? 5 : 0, row.entries / barMax * 100)}%` }} />
+                      <div title={`${row.exits} exited`} className="w-3.5 rounded-t bg-amber-500" style={{ height: `${Math.max(row.exits ? 5 : 0, row.exits / barMax * 100)}%` }} />
+                    </div>
+                    <span className="max-w-20 truncate text-[10px] text-muted-foreground">{shortPeriodLabel(row.date, period)}</span>
+                  </div>
+                ))}
               </div>
-            </div>
-            <div className="mt-2.5 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">{activeCount ?? 0}</span>
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">Vehicles currently parked</p>
+            )}
+            <div className="mt-4 flex gap-5 text-xs"><span className="flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-sm bg-blue-600" />Entered</span><span className="flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-sm bg-amber-500" />Exited</span></div>
           </CardContent>
         </Card>
 
-        <Card className="border border-border/80 bg-gradient-to-br from-card to-card/60 shadow-xs">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Peak Load</span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <TrendingUp className="h-4 w-4" />
+        <Card>
+          <CardHeader><CardTitle>Parked by vehicle type</CardTitle><CardDescription>Vehicles inside right now.</CardDescription></CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center gap-5 sm:flex-row sm:justify-center">
+              <div role="img" aria-label={`Vehicle type breakdown: ${vehicleTotals.map((item) => `${item.type} ${item.count}`).join(", ")}`} className="relative h-40 w-40 shrink-0 rounded-full" style={{ background: vehicleTotal ? `conic-gradient(${pieStops})` : "conic-gradient(#e5e7eb 0% 100%)" }}>
+                <div className="absolute inset-8 flex items-center justify-center rounded-full bg-card text-center"><div><strong className="block text-2xl">{vehicleTotal}</strong><span className="text-[10px] text-muted-foreground">parked</span></div></div>
+              </div>
+              <div className="space-y-3">
+                {vehicleTotals.map((item, index) => <div key={item.type} className="flex min-w-28 items-center justify-between gap-5 text-sm"><span className="flex items-center gap-2"><i className="h-3 w-3 rounded-sm" style={{ backgroundColor: pieColors[index] }} />{item.type === "OTHER" ? "Other" : item.type === "BIKE" ? "Bikes" : "Cars"}</span><strong>{item.count}</strong></div>)}
               </div>
             </div>
-            <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">{peak?.peakOccupancy ?? 0}</span>
-              <span className="text-xs text-muted-foreground font-medium">max</span>
-            </div>
-            <p className="mt-1 truncate text-[11px] text-muted-foreground">
-              {peak?.peakTime ? `Recorded ${new Date(peak.peakTime).toLocaleDateString([], { month: "short", day: "numeric" })}` : "Within selected range"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-border/80 bg-gradient-to-br from-card to-card/60 shadow-xs">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Avg Duration</span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                <Clock className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="mt-2.5 flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-                {formatDuration(avgDuration?.averageDurationMinutes ?? 0)}
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              {avgDuration?.sampledSessions ?? 0} sample sessions
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-border/80 bg-gradient-to-br from-card to-card/60 shadow-xs">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Throughput</span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
-                <Activity className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="mt-2.5 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">{totalEntries + totalExits}</span>
-              <span className="text-xs text-muted-foreground font-medium">moves</span>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground flex items-center gap-1.5">
-              <span className="text-emerald-600 font-medium">+{totalEntries} in</span> ·{" "}
-              <span className="text-amber-600 font-medium">-{totalExits} out</span>
-            </p>
           </CardContent>
         </Card>
       </div>
-
-      {/* Allocation Utilization Breakdown */}
       <Card className="border border-border/80 bg-card shadow-xs">
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <div className="space-y-1">
             <CardTitle className="text-base sm:text-lg flex items-center gap-2">
               <PieChart className="h-4 w-4 text-primary" />
-              Parking Space Utilization
+              Parking spaces by company
             </CardTitle>
             <CardDescription className="text-xs">
-              Live capacity breakdown grouped by company, parking level, and vehicle category.
+              Parked vehicles compared with spaces assigned to each company.
             </CardDescription>
           </div>
           <span className="text-xs font-semibold rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
@@ -393,16 +376,15 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
 
-      {/* Daily Entries & Exits Activity Table */}
       <Card className="border border-border/80 bg-card shadow-xs">
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <div className="space-y-1">
             <CardTitle className="text-base sm:text-lg flex items-center gap-2">
               <Activity className="h-4 w-4 text-primary" />
-              Daily Entry &amp; Exit Activity
+              Movement details
             </CardTitle>
             <CardDescription className="text-xs">
-              Daily vehicle movement volume across the selected date range.
+              Entry and exit totals for each selected {period}.
             </CardDescription>
           </div>
           <div className="flex items-center gap-2 text-xs font-medium">
@@ -419,19 +401,19 @@ export default function ReportsPage() {
           <Table>
             <TableHeader className="bg-muted/40">
               <TableRow>
-                <TableHead>Date</TableHead>
+                <TableHead>Period</TableHead>
                 <TableHead>Entries</TableHead>
                 <TableHead>Exits</TableHead>
                 <TableHead className="text-right">Net Flow</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {days.map((d) => {
+              {reportRows.map((d) => {
                 const net = d.entries - d.exits;
                 return (
                   <TableRow key={d.date} className="hover:bg-muted/30">
                     <TableCell className="font-medium text-foreground">
-                      {new Date(d.date).toLocaleDateString([], {
+                      {d.date.startsWith("Week of ") ? d.date : new Date(`${d.date.length === 4 ? `${d.date}-01-01` : d.date.length === 7 ? `${d.date}-01` : d.date}T00:00:00`).toLocaleDateString([], {
                         weekday: "short",
                         year: "numeric",
                         month: "short",
@@ -466,7 +448,7 @@ export default function ReportsPage() {
                   </TableRow>
                 );
               })}
-              {days.length === 0 && (
+              {reportRows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
                     No activity recorded in this date range.
@@ -478,5 +460,27 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function shortPeriodLabel(value: string, period: "day" | "week" | "month" | "year") {
+  const dateText = value.startsWith("Week of ") ? value.slice(8) : value;
+  if (period === "year") return dateText;
+  const date = new Date(`${dateText.length === 4 ? `${dateText}-01-01` : dateText.length === 7 ? `${dateText}-01` : dateText}T00:00:00`);
+  return date.toLocaleDateString([], period === "month" ? { month: "short", year: "2-digit" } : { month: "short", day: "numeric" });
+}
+
+function SummaryCard({ title, value, caption, color }: { title: string; value: number; caption: string; color: string }) {
+  return (
+    <Card>
+      <CardContent className="p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-muted-foreground">{title}</span>
+          <Car className={`h-4 w-4 ${color}`} />
+        </div>
+        <p className={`mt-2 text-3xl font-black ${color}`}>{value}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{caption}</p>
+      </CardContent>
+    </Card>
   );
 }

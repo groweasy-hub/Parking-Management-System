@@ -119,10 +119,6 @@ export default function GateSecurityPage() {
   async function handleVerifyMpin(e: FormEvent) {
     e.preventDefault();
     if (!user) return;
-    if (!rememberDevice) {
-      setError("Please select Remember this device before unlocking.");
-      return;
-    }
     setError(null);
     setSubmitting(true);
     try {
@@ -260,7 +256,6 @@ export default function GateSecurityPage() {
           {step === "verify-mpin" && (
             <form onSubmit={handleVerifyMpin} className="space-y-4">
               <MpinField id="verify-mpin" label="MPIN" value={mpin} onChange={setMpin} autoFocus />
-              <RememberDeviceCheckbox checked={rememberDevice} onChange={setRememberDevice} />
               <Button type="submit" className="h-12 w-full rounded-xl font-bold" disabled={submitting}>
                 {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LockKeyhole className="mr-2 h-4 w-4" />}
                 Unlock Gate App

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Types } from "mongoose";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
-import { ParkingSession, ParkingAllocation, Occupancy } from "../models";
+import { ParkingSession, ParkingAllocation, Occupancy, TrafficCount } from "../models";
 import { VEHICLE_TYPES } from "../types/enums";
 import { ensureProjectAccess } from "../middleware/auth";
 import { dateRange, parseDateBoundary } from "../utils/dates";
@@ -32,33 +32,40 @@ export const dailyEntriesExits = asyncHandler(async (req: Request, res: Response
   ensureProjectAccess(req.user!, query.projectId);
   const { from, to } = parseRange(query);
 
-  const baseFilter = { projectId: new Types.ObjectId(query.projectId) } as Record<string, unknown>;
-  if (query.companyId) baseFilter.companyId = new Types.ObjectId(query.companyId);
-  if (query.floorId) baseFilter.floorId = new Types.ObjectId(query.floorId);
-  if (query.vehicleType) baseFilter.vehicleType = query.vehicleType;
-
-  const [entries, exits] = await Promise.all([
-    ParkingSession.aggregate([
-      { $match: { ...baseFilter, entryTime: { $gte: from, $lte: to } } },
-      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$entryTime", timezone: env.timeZone } }, count: { $sum: 1 } } },
-      { $sort: { _id: 1 } },
+  const filter: Record<string, unknown> = { projectId: new Types.ObjectId(query.projectId) };
+  if (query.companyId) filter.companyId = new Types.ObjectId(query.companyId);
+  if (query.floorId) filter.floorId = new Types.ObjectId(query.floorId);
+  if (query.vehicleType) filter.vehicleType = query.vehicleType;
+  const fromKey = new Intl.DateTimeFormat("en-CA", { timeZone: env.timeZone }).format(from);
+  const toKey = new Intl.DateTimeFormat("en-CA", { timeZone: env.timeZone }).format(to);
+  const legacyFilter: Record<string, unknown> = { ...filter, status: "COMPLETED" };
+  const [countRows, legacyEntries, legacyExits] = await Promise.all([
+    TrafficCount.aggregate([
+      { $match: { ...filter, date: { $gte: fromKey, $lte: toKey } } },
+      { $group: { _id: "$date", entries: { $sum: "$entries" }, exits: { $sum: "$exits" } } },
     ]),
     ParkingSession.aggregate([
-      { $match: { ...baseFilter, exitTime: { $gte: from, $lte: to } } },
+      { $match: { ...legacyFilter, entryTime: { $gte: from, $lte: to } } },
+      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$entryTime", timezone: env.timeZone } }, count: { $sum: 1 } } },
+    ]),
+    ParkingSession.aggregate([
+      { $match: { ...legacyFilter, exitTime: { $gte: from, $lte: to } } },
       { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$exitTime", timezone: env.timeZone } }, count: { $sum: 1 } } },
-      { $sort: { _id: 1 } },
     ]),
   ]);
-
-  const days = new Map<string, { date: string; entries: number; exits: number }>();
-  for (const e of entries) days.set(e._id, { date: e._id, entries: e.count, exits: 0 });
-  for (const e of exits) {
-    const existing = days.get(e._id);
-    if (existing) existing.exits = e.count;
-    else days.set(e._id, { date: e._id, entries: 0, exits: e.count });
+  const byDate = new Map<string, { date: string; entries: number; exits: number }>();
+  for (const row of countRows) byDate.set(row._id, { date: row._id, entries: row.entries, exits: row.exits });
+  for (const row of legacyEntries) {
+    const day = byDate.get(row._id) ?? { date: row._id, entries: 0, exits: 0 };
+    day.entries += row.count;
+    byDate.set(row._id, day);
   }
-
-  res.json({ range: { from, to }, days: Array.from(days.values()).sort((a, b) => a.date.localeCompare(b.date)) });
+  for (const row of legacyExits) {
+    const day = byDate.get(row._id) ?? { date: row._id, entries: 0, exits: 0 };
+    day.exits += row.count;
+    byDate.set(row._id, day);
+  }
+  res.json({ range: { from, to }, days: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)) });
 });
 
 export const utilizationReport = asyncHandler(async (req: Request, res: Response) => {

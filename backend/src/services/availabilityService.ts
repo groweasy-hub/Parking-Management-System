@@ -69,7 +69,7 @@ export async function getCompanyAvailability(
 
   const results: AllocationAvailability[] = allocations.map((alloc) => {
     const occ = occupancyMap.get(String(alloc._id));
-    const capacity = occ?.capacity ?? alloc.capacity;
+    const capacity = alloc.vehicleType === "BIKE" ? Math.max(30, occ?.capacity ?? alloc.capacity) : (occ?.capacity ?? alloc.capacity);
     const occupied = occ?.occupied ?? 0;
     const floor = floorMap.get(String(alloc.floorId));
     return {
@@ -80,8 +80,10 @@ export async function getCompanyAvailability(
       vehicleType: alloc.vehicleType,
       capacity,
       occupied,
-      available: capacity - occupied,
-      status: computeStatus(capacity, occupied),
+      // Bike allocations are informational only: keep entry enabled at any
+      // occupancy, including when parked bikes exceed the configured capacity.
+      available: alloc.vehicleType === "BIKE" ? Math.max(1, capacity - occupied) : capacity - occupied,
+      status: alloc.vehicleType === "BIKE" ? "AVAILABLE" : computeStatus(capacity, occupied),
       preferred: alloc.preferred,
     };
   });
@@ -105,7 +107,7 @@ export async function getAllocationAvailability(
   if (!alloc) return null;
   const floor = await Floor.findById(alloc.floorId).lean();
   const occ = await Occupancy.findOne({ allocationId: alloc._id }).lean();
-  const capacity = occ?.capacity ?? alloc.capacity;
+  const capacity = alloc.vehicleType === "BIKE" ? Math.max(30, occ?.capacity ?? alloc.capacity) : (occ?.capacity ?? alloc.capacity);
   const occupied = occ?.occupied ?? 0;
   return {
     allocationId: String(alloc._id),
@@ -115,8 +117,9 @@ export async function getAllocationAvailability(
     vehicleType: alloc.vehicleType,
     capacity,
     occupied,
-    available: capacity - occupied,
-    status: computeStatus(capacity, occupied),
+    // Bike availability is not capped by the configured allocation.
+    available: alloc.vehicleType === "BIKE" ? Math.max(1, capacity - occupied) : capacity - occupied,
+    status: alloc.vehicleType === "BIKE" ? "AVAILABLE" : computeStatus(capacity, occupied),
     preferred: alloc.preferred,
   };
 }

@@ -22,6 +22,9 @@ function clearClientSession() {
     Object.keys(window.sessionStorage)
       .filter((key) => key.startsWith("parkflow:mpin-unlocked:"))
       .forEach((key) => window.sessionStorage.removeItem(key));
+    Object.keys(window.localStorage)
+      .filter((key) => key.startsWith("parkflow:mpin-unlocked:"))
+      .forEach((key) => window.localStorage.removeItem(key));
   }
 }
 

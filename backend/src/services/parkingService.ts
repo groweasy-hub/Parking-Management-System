@@ -10,11 +10,13 @@ import {
   ParkingAllocation,
   ParkingSession,
   Project,
+  TrafficCount,
 } from "../models";
 import { VehicleType } from "../types/enums";
 import { recordAudit } from "./auditService";
 import { allocationVehicleTypeFor, getAllocationAvailability, getCompanyAvailability } from "./availabilityService";
 import { broadcastToProject } from "../realtime/socketServer";
+import { businessDateKey } from "../utils/dates";
 
 export interface EntryInput {
   projectId: string;
@@ -122,8 +124,12 @@ export async function createEntry(input: EntryInput) {
       const currentAllocation = await ParkingAllocation.findOne({ _id: allocation._id, status: "ACTIVE" }).session(dbSession).lean();
       if (!currentAllocation) throw AppError.conflict("This parking allocation is no longer active.", "ALLOCATION_INACTIVE");
       const updatedOccupancy = await Occupancy.findOneAndUpdate(
-        { allocationId: allocation._id, $expr: { $lt: ["$occupied", "$capacity"] } },
-        { $inc: { occupied: 1 } },
+        input.vehicleType === "BIKE"
+          ? { allocationId: allocation._id }
+          : { allocationId: allocation._id, $expr: { $lt: ["$occupied", "$capacity"] } },
+        input.vehicleType === "BIKE"
+          ? { $inc: { occupied: 1 }, $max: { capacity: 30 } }
+          : { $inc: { occupied: 1 } },
         { session: dbSession, new: true }
       );
 
@@ -153,6 +159,11 @@ export async function createEntry(input: EntryInput) {
         { session: dbSession }
       );
 
+      await TrafficCount.updateOne(
+        { projectId: input.projectId, companyId: input.companyId, floorId: input.floorId, vehicleType: input.vehicleType, date: businessDateKey() },
+        { $inc: { entries: 1 } }, { upsert: true, session: dbSession }
+      );
+
       await recordAudit(
         {
           userId: input.entryUserId,
@@ -165,7 +176,6 @@ export async function createEntry(input: EntryInput) {
             companyId: input.companyId,
             floorId: input.floorId,
             vehicleType: input.vehicleType,
-            vehicleNumber,
             entryGateId: input.entryGateId,
           },
         },
@@ -232,10 +242,17 @@ export async function completeExit(input: ExitInput) {
       throw AppError.conflict("This parking session has already been completed.", "SESSION_ALREADY_COMPLETED");
     }
 
+    await ParkingSession.deleteOne({ _id: updatedSession._id }, { session: dbSession });
+
     await Occupancy.findOneAndUpdate(
       { allocationId: updatedSession.allocationId, occupied: { $gt: 0 } },
       { $inc: { occupied: -1 } },
       { session: dbSession }
+    );
+
+    await TrafficCount.updateOne(
+      { projectId: updatedSession.projectId, companyId: updatedSession.companyId, floorId: updatedSession.floorId, vehicleType: updatedSession.vehicleType, date: businessDateKey(exitTime) },
+      { $inc: { exits: 1 } }, { upsert: true, session: dbSession }
     );
 
     await recordAudit(
