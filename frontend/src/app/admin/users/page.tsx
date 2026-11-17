@@ -124,7 +124,11 @@ export default function UsersPage() {
   }
 
   async function handleCreate() {
-    if (!currentProjectId || !name || !email || !password) return;
+    if (!currentProjectId || !name || !phone || !password) return;
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      toast.error("Enter a valid work email or leave it blank.");
+      return;
+    }
     setSubmitting(true);
     try {
       await apiFetch("/api/users", {
@@ -212,9 +216,10 @@ export default function UsersPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-bold">Mobile Number (Optional Login)</Label>
+                  <Label className="text-xs font-bold">Mobile Number (Required)</Label>
                   <Input
                     type="tel"
+                    required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+91 98765 43210"
@@ -222,7 +227,7 @@ export default function UsersPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-bold">Work Email</Label>
+                  <Label className="text-xs font-bold">Work Email (Optional)</Label>
                   <Input
                     type="email"
                     value={email}
@@ -288,7 +293,7 @@ export default function UsersPage() {
               <DialogFooter className="pt-2">
                 <Button
                   onClick={handleCreate}
-                  disabled={submitting || !name || !email || !password}
+                  disabled={submitting || !name || !phone || !password}
                   className="rounded-xl font-bold h-11 w-full sm:w-auto"
                 >
                   {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
@@ -322,7 +327,7 @@ export default function UsersPage() {
                 <TableHeader className="bg-muted/30">
                   <TableRow>
                     <TableHead>Staff Member</TableHead>
-                    <TableHead>Email Address</TableHead>
+                    <TableHead>Mobile / Work Email</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
@@ -340,7 +345,10 @@ export default function UsersPage() {
                           <span>{u.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground font-mono">{u.email}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground font-mono">
+                        <span>{u.phone || "No mobile number"}</span>
+                        {u.email && <span className="block text-xs opacity-75">{u.email}</span>}
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="font-bold text-xs">
                           {roleLabel(u.role, u.customRoleLabel)}
@@ -378,7 +386,8 @@ export default function UsersPage() {
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-extrabold">{u.name}</p>
-                    <p className="truncate text-xs text-muted-foreground font-mono">{u.email}</p>
+                    <p className="truncate text-xs text-muted-foreground font-mono">{u.phone || "No mobile number"}</p>
+                    {u.email && <p className="truncate text-[11px] text-muted-foreground font-mono">{u.email}</p>}
                   </div>
                   <Badge variant="outline" className="font-bold text-[10px] shrink-0">
                     {roleLabel(u.role, u.customRoleLabel)}

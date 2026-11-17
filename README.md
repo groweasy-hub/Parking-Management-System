@@ -162,6 +162,9 @@ Never use that option for client data. The default business timezone is
   `SameSite=None; Secure` in production (see `backend/src/controllers/authController.ts`).
 - **Database**: MongoDB Atlas. Run `npm run seed` once against the production `MONGODB_URI` to
   bootstrap the super admin account (or create one manually), then change its password.
+  Before allowing user accounts without a work email, run `npm run migrate:optional-email` from
+  `backend/` once against the target database to replace the old unique email index with a sparse
+  unique index.
 
 ## What's intentionally out of scope for v1
 

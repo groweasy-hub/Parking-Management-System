@@ -18,12 +18,15 @@ export const createUserSchema = z.object({
     z.string().min(2).max(80)
   ),
   email: z.preprocess(
-    (value) => (typeof value === "string" ? sanitizeEmail(value) : value),
-    z.string().min(5).max(254).email()
+    (value) => {
+      if (typeof value !== "string") return value;
+      return sanitizeEmail(value) || undefined;
+    },
+    z.string().min(5).max(254).email().optional()
   ),
   phone: z.preprocess(
     (value) => (typeof value === "string" ? sanitizePhone(value) : value),
-    z.string().max(25).optional()
+    z.string().min(1).max(25).refine((value) => phoneDigits(value).length >= 7 && phoneDigits(value).length <= 20, "Enter a valid mobile number.")
   ),
   password: z.preprocess(
     (value) => (typeof value === "string" ? sanitizePassword(value) : value),
@@ -109,13 +112,13 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
   }
   await ensureUniqueLoginPhone(data.phone);
 
-  const existing = await User.findOne({ email: data.email.toLowerCase() }).lean();
+  const existing = data.email ? await User.findOne({ email: data.email.toLowerCase() }).lean() : null;
   if (existing) throw AppError.conflict(GENERIC_REGISTRATION_ERROR, "REGISTRATION_FAILED");
 
   const passwordHash = await hashPassword(data.password);
   const user = await User.create({
     name: data.name,
-    email: data.email.toLowerCase(),
+    email: data.email?.toLowerCase(),
     phone: data.phone,
     passwordHash,
     role: data.role,

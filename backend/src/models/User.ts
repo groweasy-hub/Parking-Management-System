@@ -3,7 +3,7 @@ import { ROLES, Role, ENTITY_STATUSES, EntityStatus } from "../types/enums";
 
 export interface IUser extends Document {
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
   passwordHash: string;
   sessionVersion: number;
@@ -23,7 +23,7 @@ export interface IUser extends Document {
 const userSchema = new Schema<IUser>(
   {
     name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, trim: true, lowercase: true, unique: true },
+    email: { type: String, trim: true, lowercase: true },
     phone: { type: String, trim: true },
     passwordHash: { type: String, required: true, select: false },
     sessionVersion: { type: Number, default: 0 },
@@ -41,5 +41,6 @@ const userSchema = new Schema<IUser>(
 );
 
 userSchema.index({ projectId: 1 });
+userSchema.index({ email: 1 }, { unique: true, sparse: true });
 
 export const User = model<IUser>("User", userSchema);

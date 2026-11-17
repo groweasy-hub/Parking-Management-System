@@ -12,6 +12,7 @@
     "postinstall": "npm run build",
     "start": "node dist/server.js",
     "seed": "tsx src/scripts/seed.ts",
+    "migrate:optional-email": "tsx src/scripts/migrateOptionalEmail.ts",
     "reconcile": "tsx src/scripts/reconcileOccupancy.ts",
     "typecheck": "tsc --noEmit",
     "smoke-test": "tsx src/scripts/smokeTest.ts",

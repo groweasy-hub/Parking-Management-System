@@ -100,7 +100,7 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
   if (!user) {
     throw AppError.badRequest("Your reset session is invalid or expired. Please check your email address again.", "INVALID_RESET_TOKEN");
   }
-  clearFailedLogin(user.email);
+  if (user.email) clearFailedLogin(user.email);
   disconnectUserSessions(String(user._id));
   res.clearCookie("accessToken", { domain: ACCESS_COOKIE_OPTIONS.domain });
   res.clearCookie("refreshToken", { domain: ACCESS_COOKIE_OPTIONS.domain, path: "/api/auth" });
@@ -185,7 +185,7 @@ function buildTokens(user: {
 function serializeAuthUser(user: {
   _id: unknown;
   name: string;
-  email: string;
+  email?: string;
   phone?: string | null;
   role: string;
   mustChangePassword?: boolean;
@@ -195,7 +195,7 @@ function serializeAuthUser(user: {
   return {
     id: user._id,
     name: user.name,
-    email: user.email,
+    email: user.email ?? "",
     phone: user.phone ?? "",
     role: user.role,
     mustChangePassword: user.mustChangePassword,

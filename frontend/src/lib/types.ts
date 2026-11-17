@@ -89,7 +89,7 @@ export interface Gate {
 export interface AppUser {
   _id: string;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
   role: Role;
   customRoleLabel?: string;
@@ -129,7 +129,7 @@ export interface ParkingSessionRecord {
 
 export interface AuditLogEntry {
   _id: string;
-  userId: { _id: string; name: string; email: string; role: Role } | null;
+  userId: { _id: string; name: string; email?: string; role: Role } | null;
   projectId: string | null;
   action: string;
   entityType: string;
