@@ -292,7 +292,7 @@ export default function EntryGatePage() {
 
   // Handle final entry submission (Barrier Open)
   const handleConfirmEntry = useCallback(async () => {
-    if (!currentProjectId || !vehicleType || (!availability?.available && vehicleType !== "BIKE") || !selectedGateId) {
+    if (!currentProjectId || !vehicleType || !availability || (!availability.available && vehicleType !== "BIKE") || !selectedGateId) {
       if (!selectedGateId) toast.error("Please select an entry gate lane.");
       return;
     }
@@ -974,7 +974,7 @@ export default function EntryGatePage() {
                 </div>
 
                 {/* GREEN CARD: PARKING SPACE AVAILABLE */}
-                {availability?.available || vehicleType === "BIKE" ? (
+                {availability && (availability.available || vehicleType === "BIKE") ? (
                   <div className="rounded-3xl border-2 border-emerald-400 bg-[#E8F5E9] dark:bg-emerald-950/40 p-6 text-center shadow-lg shadow-emerald-500/10 space-y-4">
                     <div className="flex justify-center pt-2">
                       <ParkingAvailableCenterIcon className="h-24 w-24 drop-shadow-sm" />
@@ -1037,7 +1037,7 @@ export default function EntryGatePage() {
 
               {/* Bottom Actions */}
               <div className="fixed inset-x-0 bottom-0 z-20 space-y-2 border-t border-slate-200 bg-white/95 px-5 py-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-md safe-bottom dark:border-slate-800 dark:bg-slate-900/95">
-                {availability?.available || vehicleType === "BIKE" ? (
+                {availability && (availability.available || vehicleType === "BIKE") ? (
                   <button
                     type="button"
                     onClick={handleConfirmEntry}
